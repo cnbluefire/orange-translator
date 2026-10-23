@@ -1,0 +1,9 @@
+{
+  "scripts": {
+    "test:browser": "node browser-tests/run.mjs",
+    "build": "powershell -NoProfile -ExecutionPolicy Bypass -File ../build/build-extension.ps1"
+  },
+  "dependencies": {
+    "playwright": "^1.64.1"
+  }
+}

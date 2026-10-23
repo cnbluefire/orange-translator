@@ -1,0 +1,13 @@
+resources/
+temp/
+build/*
+!build/build-extension.ps1
+tools/.venv/
+tools/node_modules/
+.env
+.env.*
+*.key
+*.log
+test-results/
+playwright-report/
+__pycache__/

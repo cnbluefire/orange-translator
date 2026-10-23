@@ -1,0 +1,118 @@
+<!doctype html>
+<meta charset="utf-8">
+<title data-i18n="settingsTitle">橙竟是翻译</title>
+<link rel="stylesheet" href="ui.css">
+<script src="i18n.js"></script>
+<main class="settings settings-shell">
+  <header class="settings-header">
+    <div class="settings-title"><span class="brand" data-i18n="settingsTitle">橙竟是翻译</span><span class="pill">v0.1</span></div>
+  </header>
+
+  <section class="settings-card">
+    <div class="card-head"><h2 data-i18n="translationService">翻译服务</h2><span id="provider-badge" class="badge">免 Key</span></div>
+    <p class="section-help" data-i18n="translationServiceHelp">划词翻译和沉浸式网页翻译都使用这里的服务。</p>
+    <label><span data-i18n="serviceType">服务类型</span>
+      <select id="provider" data-combobox>
+        <option value="microsoft-free" data-i18n="microsoftFree">Microsoft 翻译（无需 Key）</option>
+        <option value="google-free" data-i18n="googleFree">Google 翻译（无需 Key）</option>
+        <option value="openai" data-i18n="openaiProvider">OpenAI 兼容接口（自填 Key）</option>
+        <option value="azure" data-i18n="azureProvider">Azure Translator（自填 Key）</option>
+        <option value="google" data-i18n="googleCloudProvider">Google Cloud Translation（自填 Key）</option>
+      </select>
+    </label>
+
+    <div data-provider="google-free" class="keyless-provider-actions">
+      <div class="provider-action-row"><span class="provider-status" data-provider-status role="status"></span><div class="provider-actions"><button class="secondary" data-test-provider data-i18n="testService">测试当前服务</button></div></div>
+    </div>
+
+    <div data-provider="microsoft-free" class="keyless-provider-actions">
+      <div class="provider-action-row"><span class="provider-status" data-provider-status role="status"></span><div class="provider-actions"><button class="secondary" data-test-provider data-i18n="testService">测试当前服务</button></div></div>
+    </div>
+
+    <div data-provider="openai">
+      <label>Base URL<input id="baseUrl" placeholder="https://openrouter.ai/api/v1"></label>
+      <label><span data-i18n="model">模型</span><input id="model" placeholder="openrouter/free"></label>
+      <label>API Key<input id="apiKey" type="password" autocomplete="off" placeholder="sk-..."></label>
+      <div class="secret-actions"><span class="provider-status" data-provider-status role="status"></span><div class="provider-actions"><button class="save-secret" data-secret="apiKey" data-key-label="OpenAI Key" data-i18n="saveOpenaiKey">保存 OpenAI Key</button><button class="secondary" data-test-provider data-i18n="testService">测试当前服务</button></div></div>
+    </div>
+
+    <div data-provider="azure">
+      <label>Endpoint<input id="azureEndpoint" placeholder="https://api.cognitive.microsofttranslator.com"></label>
+      <label>Subscription Key<input id="azureKey" type="password" autocomplete="off"></label>
+      <label><span data-i18n="regionOptional">Region（可选）</span><input id="azureRegion" placeholder="eastasia"></label>
+      <div class="secret-actions"><span class="provider-status" data-provider-status role="status"></span><div class="provider-actions"><button class="save-secret" data-secret="azureKey" data-key-label="Azure Key" data-i18n="saveAzureKey">保存 Azure Key</button><button class="secondary" data-test-provider data-i18n="testService">测试当前服务</button></div></div>
+    </div>
+
+    <div data-provider="google">
+      <label>Google Cloud API Key<input id="googleKey" type="password" autocomplete="off"></label>
+      <div class="secret-actions"><span class="provider-status" data-provider-status role="status"></span><div class="provider-actions"><button class="save-secret" data-secret="googleKey" data-key-label="Google Key" data-i18n="saveGoogleKey">保存 Google Key</button><button class="secondary" data-test-provider data-i18n="testService">测试当前服务</button></div></div>
+    </div>
+  </section>
+
+  <section class="settings-card">
+    <div class="card-head"><h2 data-i18n="language">语言</h2></div>
+    <label><span data-i18n="interfaceLanguage">界面语言</span>
+      <select id="uiLanguage" data-combobox>
+        <option value="auto" data-i18n="languageAuto">自动（跟随浏览器）</option>
+        <option value="zh-CN">简体中文</option>
+        <option value="en">English</option>
+      </select>
+    </label>
+    <div class="two-columns">
+      <label><span data-i18n="sourceLanguage">源语言</span><select id="sourceLanguage" data-combobox></select></label>
+      <label><span data-i18n="targetLanguage">目标语言</span><select id="targetLanguage" data-combobox></select></label>
+    </div>
+  </section>
+
+  <section class="settings-card">
+    <div class="card-head"><h2 data-i18n="immersiveTranslation">沉浸式翻译</h2></div>
+    <div class="field-label" data-i18n="translationStyle">译文样式</div>
+    <div class="theme-select">
+      <select id="translationTheme" data-combobox>
+        <option value="none" data-i18n="themeNone">无</option>
+        <option value="grey" data-i18n="themeGrey">黑灰色</option>
+        <option value="dashed" data-i18n="themeDashed">虚线下划线</option>
+        <option value="thinDashed" data-i18n="themeThinDashed">细虚线下划线</option>
+        <option value="dotted" data-i18n="themeDotted">点状下划线</option>
+        <option value="underline" data-i18n="themeUnderline">直线下划线</option>
+        <option value="nativeDashed" data-i18n="themeNativeDashed">系统虚线下划线</option>
+        <option value="nativeDotted" data-i18n="themeNativeDotted">系统点状下划线</option>
+        <option value="nativeUnderline" data-i18n="themeNativeUnderline">系统直线下划线</option>
+        <option value="wavy" data-i18n="themeWavy">波浪线</option>
+        <option value="dashedBorder" data-i18n="themeDashedBorder">虚线边框</option>
+        <option value="solidBorder" data-i18n="themeSolidBorder">实线边框</option>
+        <option value="dividingLine" data-i18n="themeDividingLine">分割线</option>
+        <option value="highlight" data-i18n="themeHighlight">高亮</option>
+        <option value="marker" data-i18n="themeMarker">马克笔</option>
+        <option value="marker2" data-i18n="themeMarker2">马克笔（醒目）</option>
+        <option value="blockquote" data-i18n="themeBlockquote">引用样式</option>
+        <option value="weakening" data-i18n="themeWeakening">弱化</option>
+        <option value="italic" data-i18n="themeItalic">斜体</option>
+        <option value="bold" data-i18n="themeBold">加粗</option>
+        <option value="paper" data-i18n="themePaper">白纸阴影</option>
+        <option value="mask" data-i18n="themeMask">模糊效果（学习模式）</option>
+        <option value="opacity" data-i18n="themeOpacity">透明效果</option>
+        <option value="background" data-i18n="themeBackground">背景色</option>
+      </select>
+    </div>
+    <div id="translation-theme-preview" class="theme-preview" data-theme="opacity">
+      <div class="theme-preview-label" data-i18n="bilingualPreview">双语预览</div>
+      <p class="theme-preview-source">Reading connects us with ideas from around the world.</p>
+      <p class="theme-preview-translation" data-i18n="previewTranslation">阅读让我们与世界各地的思想相连。</p>
+    </div>
+    <label class="switch-row">
+      <span><b data-i18n="showProgressPanel">显示翻译进度浮窗</b><small data-i18n="showProgressPanelHelp">在页面右上角显示翻译进度、暂停和退出按钮。</small></span>
+      <input id="showImmersiveStatus" type="checkbox" role="switch">
+    </label>
+    <p class="section-help" data-i18n="progressDefaultOff">默认关闭。接口错误仍会显示提示。</p>
+    <button id="open-shortcuts" class="secondary" data-i18n="openShortcuts">打开浏览器快捷键设置</button>
+  </section>
+
+  <section class="settings-card">
+    <div class="card-head"><h2 data-i18n="translationCache">翻译缓存</h2><span class="badge" id="cache-count" data-i18n="loading">读取中…</span></div>
+    <p class="section-help" data-i18n="cacheHelp">相同服务、模型、语言和原文会直接复用本地结果，不再消耗接口额度。缓存最多保留 1000 条，超过 30 天自动失效。</p>
+    <div class="cache-row"><span id="cache-size" data-i18n="calculatingCache">正在统计缓存占用…</span><button id="clear-cache" class="danger-secondary" data-i18n="clearCache">清除翻译缓存</button></div>
+  </section>
+
+</main>
+<script type="module" src="options.js"></script>
