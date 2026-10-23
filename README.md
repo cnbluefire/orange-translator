@@ -88,6 +88,8 @@ npm --prefix tools run test:browser
 - 可以在设置页清除翻译缓存。
 - 各翻译服务如何处理请求内容，受对应服务商的隐私政策约束。
 
+完整政策见 [`PRIVACY.md`](PRIVACY.md)。
+
 ## 第三方软件与数据
 
 项目包含 PDF.js、Adobe CMaps，以及来源于参考扩展的兼容数据。详情和适用许可见 [`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md)。
