@@ -4,9 +4,9 @@ import os
 import sys
 import urllib.request
 
-base = os.getenv("OPENAI_BASE_URL", "https://openrouter.ai/api/v1").rstrip("/")
+base = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1").rstrip("/")
 key = os.getenv("OPENROUTER_API_KEY") or os.getenv("OPENAI_API_KEY")
-model = os.getenv("OPENAI_MODEL", "openrouter/free")
+model = os.getenv("OPENAI_MODEL", "gpt-5.6-luna")
 if not key:
     raise SystemExit("请设置 OPENROUTER_API_KEY 或 OPENAI_API_KEY")
 data = {

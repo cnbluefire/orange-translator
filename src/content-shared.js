@@ -1,8 +1,8 @@
 globalThis.LiteTranslate = (() => {
   const DEFAULTS = {
     provider: 'microsoft-free',
-    baseUrl: 'https://openrouter.ai/api/v1',
-    model: 'openrouter/free',
+    baseUrl: 'https://api.openai.com/v1',
+    model: 'gpt-5.6-luna',
     apiKey: '',
     azureEndpoint: 'https://api.cognitive.microsofttranslator.com',
     azureKey: '',
