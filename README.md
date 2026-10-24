@@ -1,6 +1,6 @@
 # 橙竟是翻译（Orange Translator）
 
-[![Microsoft Edge Add-ons](https://img.shields.io/badge/Microsoft%20Edge-获取扩展-0078D7?logo=microsoftedge&logoColor=white)](https://microsoftedge.microsoft.com/addons/detail/%E6%A9%99%E7%AB%9F%E6%98%AF%E7%BF%BB%E8%AF%91/ekodakiiajjeaklellnlnahnhfaeabjn)
+[![Microsoft Edge Add-ons](https://img.shields.io/badge/Microsoft%20Edge-获取扩展-0078D7?logo=microsoftedge&logoColor=white)](https://microsoftedge.microsoft.com/addons/detail/ekodakiiajjeaklellnlnahnhfaeabjn)
 
 一款 Chrome/Edge Manifest V3 翻译扩展，提供划词翻译、文本翻译、双语网页翻译和内置 PDF.js 阅读器。
 
