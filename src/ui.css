@@ -25,18 +25,19 @@
 .settings-card .switch-row input[type="checkbox"]:checked { border-color:#0f6cbd; background:#0f6cbd; }
 .settings-card .switch-row input[type="checkbox"]:checked::before { background:#fff; transform:translateX(18px); }
 .field-hint { margin:-5px 0 12px; color:#7a8089; font-size:11px; }
-.secret-actions, .provider-action-row { display:flex; align-items:center; justify-content:space-between; gap:12px; margin:8px 0 12px; }
+.secret-actions, .provider-action-row { display:flex; align-items:center; justify-content:space-between; gap:12px; margin:12px 0 0; }
 .secret-actions .field-hint { margin:0; }
 .save-secret { flex:0 0 auto; }
 .provider-actions { display:flex; align-items:center; justify-content:flex-end; flex-wrap:wrap; gap:8px; margin-left:auto; }
 .provider-note .provider-actions { margin-top:10px; }
-.keyless-provider-actions { margin-top:10px; }
-.provider-status { display:block; flex:1 1 auto; min-width:0; min-height:20px; color:var(--muted); font-size:13px; line-height:1.45; overflow-wrap:anywhere; }
+.keyless-provider-actions { margin-top:0; }
+.provider-status { display:block; flex:1 1 auto; min-width:0; color:var(--muted); font-size:13px; line-height:1.45; overflow-wrap:anywhere; }
+.provider-status:empty { min-height:0; }
 .provider-status[data-kind="ok"] { color:#16803c; }
 .provider-status[data-kind="error"] { color:#b42318; }
 
 /* 中性白/米白界面；橙色只用于交互强调。 */
-:root { color-scheme: light dark; --accent:#e56a16; --accent-hover:#c95708; --accent-pressed:#a94706; --accent-soft:#fff2e8; --accent-border:#f5c9aa; --page:#f6f7f8; --surface:#fff; --surface-alt:#f7f7f7; --text:#292725; --muted:#716d69; --border:#e1e3e6; --shadow:#1f29370d; background:var(--page); color:var(--text); }
+:root { color-scheme: light dark; --font-page-title:28px; --font-section-title:18px; --font-label:14px; --font-body:14px; --font-help:13px; --font-caption:12px; --accent:#e56a16; --accent-hover:#c95708; --accent-pressed:#a94706; --accent-soft:#fff2e8; --accent-border:#f5c9aa; --page:#f6f7f8; --surface:#fff; --surface-alt:#f7f7f7; --text:#292725; --muted:#716d69; --border:#e1e3e6; --shadow:#1f29370d; background:var(--page); color:var(--text); }
 html, body { background:var(--page); color:var(--text); }
 .popup-shell { background:#fff; color:var(--text); }
 .quick-card, .action-list, .settings-card, #pdf-content article { background:var(--surface); border-color:var(--border); box-shadow:0 2px 8px var(--shadow); }
@@ -104,6 +105,22 @@ button:active { background:var(--accent-pressed); transform:translateY(1px); }
 .settings-card .switch-row input[type="checkbox"]:checked { border-color:var(--accent); background:var(--accent); }
 .badge[data-kind="key"] { background:var(--accent-soft); color:var(--accent-hover); }
 .save-secret { background:var(--accent); }
+.quick-result { max-height:min(220px, 35vh); overflow-x:hidden; overflow-y:auto; overscroll-behavior:contain; scrollbar-gutter:stable; overflow-wrap:anywhere; }
+.quick-result::-webkit-scrollbar { width:8px; }
+.quick-result::-webkit-scrollbar-thumb { border:2px solid transparent; border-radius:8px; background:#aeb5bf; background-clip:padding-box; }
+
+/* 设置页字号层级 */
+.settings { font-size:var(--font-body); line-height:1.55; }
+.settings-header .brand { font-size:var(--font-page-title); line-height:1.2; letter-spacing:-.02em; }
+.settings-card h2 { font-size:var(--font-section-title); font-weight:650; line-height:1.35; }
+.settings-card label, .settings-card .field-label { font-size:var(--font-label); font-weight:400; line-height:1.45; }
+.settings-card .switch-row b { font-size:var(--font-label); font-weight:500; line-height:1.45; }
+.settings-card input, .settings-card textarea, .settings-card button, .settings-card .custom-combobox-button, .settings-card .custom-combobox-menu [role="option"] { font-size:var(--font-body); line-height:1.45; }
+.settings-card .section-help, .settings-card .switch-row small, .settings-card .provider-status, .settings-card .cache-row { font-size:var(--font-help); line-height:1.55; }
+.settings-card .badge, .settings-header .pill, .theme-preview-label { font-size:var(--font-caption); line-height:1.35; }
+.theme-preview-source, .theme-preview-translation { font-size:var(--font-help); }
+.settings-card .custom-combobox-button, .settings-card input, .settings-card button { font-weight:400; }
+.settings-card .custom-combobox-menu [role="option"].is-selected { font-weight:500; }
 
 @media (prefers-color-scheme: dark) {
   :root { --accent:#ff8a3d; --accent-hover:#ff9f5f; --accent-pressed:#df6c22; --accent-soft:#34271f; --accent-border:#65412a; --page:#181818; --surface:#242424; --surface-alt:#2d2d2d; --text:#f2f2f2; --muted:#b5b5b5; --border:#404040; --shadow:#00000055; }

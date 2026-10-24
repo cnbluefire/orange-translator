@@ -1,9 +1,16 @@
 #lt-root { position: fixed; z-index: 2147483647; width: 380px; font: 14px/1.55 "Segoe UI", system-ui, sans-serif; color: #202124; }
-#lt-root[hidden], #lt-trigger[hidden] { display: none !important; }
+#lt-root[hidden], #lt-trigger[hidden], #lt-immersive-ball[hidden] { display: none !important; }
 #lt-trigger { position: fixed; z-index: 2147483647; display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; cursor: default; transform-origin:center; }
 #lt-trigger img { display:block; width:32px; height:32px; max-width:none; filter:drop-shadow(0 2px 3px #0005); transition:filter .12s ease; pointer-events:none; user-select:none; }
 #lt-trigger:hover, #lt-trigger:focus-visible { box-shadow:none; outline: none; }
 #lt-trigger:hover img, #lt-trigger:focus-visible img { filter:drop-shadow(0 3px 5px #0006); }
+#lt-immersive-ball { position:fixed; z-index:2147483646; display:grid; place-items:center; width:48px; height:48px; margin:0; padding:0; border:1px solid rgba(120,110,100,.28); border-radius:50%; background:rgba(255,255,255,.96); box-shadow:0 2px 5px #0002,0 8px 22px #0003; cursor:grab; touch-action:none; user-select:none; transform:scale(1); transition:transform .12s cubic-bezier(.2,.8,.2,1),box-shadow .12s ease,background-color .12s ease; }
+#lt-immersive-ball:hover { background:#fff; box-shadow:0 3px 7px #0002,0 10px 26px #0004; }
+#lt-immersive-ball.is-pressed:not(.is-dragging) { transform:scale(.9); box-shadow:0 1px 3px #0002,0 4px 12px #0003; }
+#lt-immersive-ball.is-dragging { cursor:grabbing; transform:scale(1.04); box-shadow:0 4px 10px #0003,0 12px 30px #0004; }
+#lt-immersive-ball img { display:block; width:38px; height:38px; filter:none; pointer-events:none; user-select:none; transform-origin:center; }
+#lt-immersive-ball.is-translating img { animation:lt-immersive-ball-spin .6s linear infinite; }
+@keyframes lt-immersive-ball-spin { to { transform:rotate(360deg); } }
 #lt-trigger.lt-trigger-enter { animation:lt-trigger-in .18s cubic-bezier(.2,.8,.2,1) both; }
 #lt-trigger.lt-trigger-exit { pointer-events:none; animation:lt-trigger-out .15s ease-in both; }
 #lt-trigger:hover:not(.lt-trigger-exit) img, #lt-trigger:focus-visible:not(.lt-trigger-exit) img { animation:lt-trigger-wiggle .55s ease-in-out infinite; transform-origin:center; }
@@ -102,7 +109,10 @@
   #lt-trigger { box-shadow:none; }
   #lt-trigger img { filter:drop-shadow(0 2px 4px #000a); }
   #lt-trigger:hover img, #lt-trigger:focus-visible img { filter:drop-shadow(0 3px 6px #000b); }
+  #lt-immersive-ball { border-color:#ffffff26; background:rgba(42,42,42,.96); box-shadow:0 2px 5px #0008,0 8px 22px #0009; }
+  #lt-immersive-ball:hover { background:#333; }
 }
 @media (prefers-reduced-motion: reduce) {
   #lt-trigger.lt-trigger-enter, #lt-trigger.lt-trigger-exit, #lt-trigger:hover img, #lt-trigger:focus-visible img, .lt-selection-root.lt-panel-enter { animation:none; }
+  #lt-immersive-ball { transition:none; }
 }

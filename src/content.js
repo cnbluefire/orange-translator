@@ -21,7 +21,16 @@ trigger.append(triggerIcon);
 trigger.hidden = true;
 document.documentElement.append(trigger);
 
+const immersiveBall = document.createElement('button');
+immersiveBall.id = 'lt-immersive-ball';
+immersiveBall.type = 'button';
+immersiveBall.hidden = true;
+immersiveBall.innerHTML = `<img src="${chrome.runtime.getURL('icons/icon.svg')}" alt="">`;
+if (IS_TOP_FRAME) document.documentElement.append(immersiveBall);
+
 let selectedText = '';
+let lastSelectedText = '';
+let lastSelectionAt = 0;
 let panelMode = '';
 let selectionRequest = null;
 let selectionVersion = 0;
@@ -33,12 +42,17 @@ let panelAnimationTimer = null;
 let triggerVersion = 0;
 let selectionPosition = null;
 let selectionAnchor = null;
+let lastSelectionAnchor = null;
 let lastContextMenuPoint = null;
 let panelDrag = null;
-let immersiveStatusEnabled = false;
 let selectionTriggerEnabled = true;
+let immersiveBallEnabled = false;
+let immersiveBallDrag = null;
+let immersiveBallSpinStartedAt = 0;
+let immersiveBallSpinStopTimer = null;
 let touchGesture = 'disabled';
-let touchCandidate = null;
+let pointerGestureCandidate = null;
+const activeTouchPointers = new Map();
 const HOVER_INTENT_MS = 500;
 const SCROLL_IDLE_MS = 280;
 let ruleStyle = null;
@@ -46,41 +60,143 @@ let ruleStyle = null;
 settings().then(cfg => {
   touchGesture = cfg.touchGesture || 'disabled';
   setSelectionTriggerEnabled(cfg.enableSelectionTrigger !== false);
+  setImmersiveBallEnabled(cfg.showImmersiveBall === true, cfg.immersiveBallPosition);
 }).catch(() => {});
 
 const TOUCH_COUNTS = { two: 2, three: 3, four: 4 };
-document.addEventListener('touchstart', event => {
+document.addEventListener('pointerdown', event => {
+  if (event.pointerType !== 'touch' || event.target.closest?.('#lt-root,#lt-trigger,#lt-immersive-ball')) return;
   const required = TOUCH_COUNTS[touchGesture];
-  if (!required || event.touches.length !== required || event.target.closest?.('#lt-root,#lt-trigger')) {
-    touchCandidate = null;
+  if (!required) return;
+  activeTouchPointers.set(event.pointerId, { x: event.clientX, y: event.clientY, moved: false });
+  if (activeTouchPointers.size === required) pointerGestureCandidate = { count: required, startedAt: performance.now(), moved: false };
+  else if (activeTouchPointers.size > required) pointerGestureCandidate = null;
+}, true);
+document.addEventListener('pointermove', event => {
+  if (event.pointerType !== 'touch' || !activeTouchPointers.has(event.pointerId)) return;
+  const point = activeTouchPointers.get(event.pointerId);
+  if (Math.hypot(event.clientX - point.x, event.clientY - point.y) > 18) point.moved = true;
+}, true);
+const finishTouchPointer = event => {
+  if (event.pointerType !== 'touch' || !activeTouchPointers.has(event.pointerId)) return;
+  const point = activeTouchPointers.get(event.pointerId);
+  activeTouchPointers.delete(event.pointerId);
+  if (point.moved && pointerGestureCandidate) pointerGestureCandidate.moved = true;
+  if (!activeTouchPointers.size && pointerGestureCandidate) {
+    const candidate = pointerGestureCandidate;
+    pointerGestureCandidate = null;
+    if (!candidate.moved && performance.now() - candidate.startedAt <= 500) toggleImmersive();
+  }
+};
+document.addEventListener('pointerup', finishTouchPointer, true);
+document.addEventListener('pointercancel', event => { activeTouchPointers.delete(event.pointerId); pointerGestureCandidate = null; }, true);
+
+function clampImmersiveBall(left, top) {
+  const size = 48;
+  return {
+    left: Math.min(window.innerWidth - size - 8, Math.max(8, left)),
+    top: Math.min(window.innerHeight - size - 8, Math.max(8, top))
+  };
+}
+
+function placeImmersiveBall(position) {
+  if (!IS_TOP_FRAME) return;
+  const fallback = { left: 16, top: window.innerHeight - 76 };
+  const next = clampImmersiveBall(Number(position?.left ?? fallback.left), Number(position?.top ?? fallback.top));
+  immersiveBall.style.left = `${next.left}px`;
+  immersiveBall.style.top = `${next.top}px`;
+}
+
+function setImmersiveBallEnabled(enabled, position) {
+  immersiveBallEnabled = enabled && IS_TOP_FRAME;
+  immersiveBall.hidden = !immersiveBallEnabled;
+  if (immersiveBallEnabled) placeImmersiveBall(position);
+}
+
+function updateImmersiveBallActivity(active) {
+  const cycleMs = 600;
+  clearTimeout(immersiveBallSpinStopTimer);
+  immersiveBallSpinStopTimer = null;
+  if (active) {
+    if (!immersiveBall.classList.contains('is-translating')) {
+      immersiveBallSpinStartedAt = performance.now();
+      immersiveBall.classList.add('is-translating');
+    }
     return;
   }
-  touchCandidate = {
-    count: required,
-    startedAt: performance.now(),
-    points: [...event.touches].map(touch => ({ id: touch.identifier, x: touch.clientX, y: touch.clientY })),
-    ended: new Set(),
-    moved: false
-  };
-}, { passive: true });
-document.addEventListener('touchmove', event => {
-  if (!touchCandidate) return;
-  for (const touch of event.touches) {
-    const start = touchCandidate.points.find(point => point.id === touch.identifier);
-    if (!start || Math.hypot(touch.clientX - start.x, touch.clientY - start.y) > 18) { touchCandidate.moved = true; break; }
-  }
-}, { passive: true });
-document.addEventListener('touchend', event => {
-  if (!touchCandidate) return;
-  for (const touch of event.changedTouches) touchCandidate.ended.add(touch.identifier);
-  if (event.touches.length) return;
-  const candidate = touchCandidate;
-  touchCandidate = null;
-  if (!candidate.moved && performance.now() - candidate.startedAt <= 500 && candidate.ended.size === candidate.count) toggleImmersive();
-}, { passive: true });
-document.addEventListener('touchcancel', () => { touchCandidate = null; }, { passive: true });
+  if (!immersiveBall.classList.contains('is-translating')) return;
+  const elapsed = performance.now() - immersiveBallSpinStartedAt;
+  const remaining = cycleMs - (elapsed % cycleMs);
+  immersiveBallSpinStopTimer = setTimeout(() => {
+    immersiveBall.classList.remove('is-translating');
+    immersiveBallSpinStartedAt = 0;
+    immersiveBallSpinStopTimer = null;
+  }, remaining < 24 ? cycleMs : remaining);
+}
+
+immersiveBall.addEventListener('pointerdown', event => {
+  const rect = immersiveBall.getBoundingClientRect();
+  immersiveBallDrag = { id: event.pointerId, offsetX: event.clientX - rect.left, offsetY: event.clientY - rect.top, startX: event.clientX, startY: event.clientY, moved: false };
+  immersiveBall.classList.add('is-pressed');
+  immersiveBall.setPointerCapture?.(event.pointerId);
+  event.preventDefault();
+});
+immersiveBall.addEventListener('pointermove', event => {
+  if (!immersiveBallDrag || event.pointerId !== immersiveBallDrag.id) return;
+  if (Math.hypot(event.clientX - immersiveBallDrag.startX, event.clientY - immersiveBallDrag.startY) > 5) immersiveBallDrag.moved = true;
+  if (immersiveBallDrag.moved) immersiveBall.classList.add('is-dragging');
+  const next = clampImmersiveBall(event.clientX - immersiveBallDrag.offsetX, event.clientY - immersiveBallDrag.offsetY);
+  immersiveBall.style.left = `${next.left}px`;
+  immersiveBall.style.top = `${next.top}px`;
+});
+immersiveBall.addEventListener('pointerup', event => {
+  if (!immersiveBallDrag || event.pointerId !== immersiveBallDrag.id) return;
+  const moved = immersiveBallDrag.moved;
+  immersiveBallDrag = null;
+  immersiveBall.classList.remove('is-pressed', 'is-dragging');
+  if (moved) chrome.storage.local.set({ immersiveBallPosition: { left: parseFloat(immersiveBall.style.left), top: parseFloat(immersiveBall.style.top) } });
+  else toggleImmersive();
+});
+immersiveBall.addEventListener('pointercancel', () => { immersiveBallDrag = null; immersiveBall.classList.remove('is-pressed', 'is-dragging'); });
 
 const esc = value => String(value).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
+
+function frameAnchorInParent(anchor, frame) {
+  const rect = frame.getBoundingClientRect();
+  const scaleX = frame.clientWidth ? rect.width / frame.clientWidth : 1;
+  const scaleY = frame.clientHeight ? rect.height / frame.clientHeight : 1;
+  return {
+    left: rect.left + anchor.left * scaleX,
+    right: rect.left + anchor.right * scaleX,
+    top: rect.top + anchor.top * scaleY,
+    bottom: rect.top + anchor.bottom * scaleY
+  };
+}
+
+function directChildFrame(sourceWindow) {
+  return [...document.querySelectorAll('iframe,frame')].find(frame => {
+    try { return frame.contentWindow === sourceWindow; } catch { return false; }
+  }) || null;
+}
+
+function forwardSelectionToTop(text, anchor) {
+  hideTrigger({ immediate: true });
+  window.parent.postMessage({ type: 'orange-translator-selection', text, anchor }, '*');
+}
+
+window.addEventListener('message', event => {
+  if (event.data?.type !== 'orange-translator-selection' || typeof event.data.text !== 'string' || !event.data.text.trim()) return;
+  const frame = directChildFrame(event.source);
+  if (!frame) return;
+  const anchor = frameAnchorInParent(event.data.anchor, frame);
+  if (!IS_TOP_FRAME) {
+    window.parent.postMessage({ type: 'orange-translator-selection', text: event.data.text, anchor }, '*');
+    return;
+  }
+  selectionPosition = null;
+  selectionAnchor = anchor;
+  selectionTranslate(event.data.text, true);
+});
 
 function placeSelectionPanel() {
   const width = Math.min(380, window.innerWidth - 16);
@@ -138,19 +254,6 @@ function originalBlock(text) {
 
 function selectionCard(title, text, body) {
   return `<div class="lt-head" data-drag-handle><b>${title}</b><button data-close aria-label="${t('close')}">×</button></div><div class="lt-card-body">${originalBlock(text)}${body}</div>`;
-}
-
-function showImmersive(html, force = false) {
-  if (!IS_TOP_FRAME) return;
-  if (!immersiveStatusEnabled && !force) return;
-  panelMode = 'immersive';
-  root.className = 'lt-immersive-control-root';
-  root.style.width = 'auto';
-  root.style.left = 'auto';
-  root.style.right = '18px';
-  root.style.top = '18px';
-  root.innerHTML = `<div class="lt-card lt-control-card">${html}</div>`;
-  root.hidden = false;
 }
 
 function closeSelection() {
@@ -217,29 +320,84 @@ function liveSelectionText() {
   return selection.toString().trim();
 }
 
-function scheduleTrigger(pointer) {
+function selectionInsideExtensionUi() {
+  const selection = document.getSelection();
+  if (!selection || selection.isCollapsed || selection.rangeCount === 0) return false;
+  const container = selection.getRangeAt(0).commonAncestorContainer;
+  const element = container.nodeType === Node.ELEMENT_NODE ? container : container.parentElement;
+  return Boolean(element?.closest?.('#lt-root,#lt-trigger,#lt-immersive-ball'));
+}
+
+function selectedPageText() {
+  const live = liveSelectionText();
+  if (live) return selectionInsideExtensionUi() ? '' : live;
+  return performance.now() - lastSelectionAt <= 10000 ? lastSelectedText : '';
+}
+
+function controlSelectionText(element) {
+  if (!(element instanceof HTMLTextAreaElement || element instanceof HTMLInputElement)) return '';
+  const start = Number(element.selectionStart);
+  const end = Number(element.selectionEnd);
+  return Number.isInteger(start) && Number.isInteger(end) && end > start ? element.value.slice(start, end).trim() : '';
+}
+
+function rememberPageSelection() {
+  const selection = document.getSelection();
+  const text = liveSelectionText();
+  if (!selection || !text || selectionInsideExtensionUi()) return;
+  const range = selection.getRangeAt(0);
+  const rects = [...range.getClientRects()];
+  const rect = rects.at(-1) || range.getBoundingClientRect();
+  lastSelectedText = text;
+  lastSelectionAt = performance.now();
+  lastSelectionAnchor = { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom };
+}
+
+document.addEventListener('selectionchange', rememberPageSelection);
+
+function scheduleTrigger(pointer, capturedAnchor = null) {
   const version = ++triggerVersion;
   clearTimeout(triggerTimer);
   const position = pointer && { clientX: pointer.clientX, clientY: pointer.clientY };
-  triggerTimer = setTimeout(() => {
+  const control = pointer?.target;
+  triggerTimer = setTimeout(() => requestAnimationFrame(() => requestAnimationFrame(() => {
     triggerTimer = null;
     if (version !== triggerVersion) return;
-    const text = liveSelectionText();
-    if (!text) {
+    const selection = document.getSelection();
+    const liveText = liveSelectionText();
+    const controlText = controlSelectionText(control);
+    const text = liveText || controlText;
+    if (!text || (liveText && selectionInsideExtensionUi())) {
       selectedText = '';
       hideTrigger();
       return;
     }
+    let anchor = capturedAnchor || lastSelectionAnchor;
+    if (liveText && selection?.rangeCount) {
+      const range = selection.getRangeAt(0);
+      const rects = [...range.getClientRects()];
+      const rect = rects.at(-1) || range.getBoundingClientRect();
+      anchor = { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom };
+    }
     selectedText = text;
+    lastSelectedText = text;
+    lastSelectionAt = performance.now();
+    lastSelectionAnchor = anchor;
     placeTrigger(position);
-  }, 0);
+  })), 0);
 }
 
-async function selectionTranslate(text = selectedText) {
+async function selectionTranslate(text = selectedText, renderInThisFrame = false) {
   await localeReady;
   text = text.trim();
   if (!text) return;
+  if (!IS_TOP_FRAME && !renderInThisFrame) {
+    const rect = selectionAnchor || trigger.getBoundingClientRect();
+    forwardSelectionToTop(text, { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom });
+    return;
+  }
   selectedText = text;
+  lastSelectedText = text;
   const version = ++selectionVersion;
   selectionRequest?.abort();
   selectionRequest = new AbortController();
@@ -467,6 +625,7 @@ function replaceLoadingWithTranslation(loading, translation, targetLanguage, the
 }
 
 function restoreImmersive() {
+  updateImmersiveBallActivity(false);
   if (immersiveState) immersiveState.active = false;
   immersiveState?.observer?.disconnect();
   immersiveState?.dynamicObserver?.disconnect();
@@ -644,6 +803,7 @@ async function flushVisibleBatch(state) {
     if (inViewport && !state.loading.has(item.id) && item.source.isConnected) state.loading.set(item.id, addLoadingPlaceholder(item.source));
   }
   state.inFlight += 1;
+  updateImmersiveBallActivity(true);
   updateImmersiveStatus(state, t('translating'));
   try {
     const translated = await translateItems(batch.map(({ id, text }) => ({ id, text })), state.cfg, state.controller.signal);
@@ -677,11 +837,18 @@ async function flushVisibleBatch(state) {
     }
     if (error.name !== 'AbortError' && state.active) {
       state.active = false;
+      updateImmersiveBallActivity(false);
       state.observer.disconnect();
-      showImmersive(`<div class="lt-head"><b>${t('translationFailed')}</b><button data-dismiss>×</button></div><div class="lt-muted">${esc(error.message)}</div><div class="lt-control-actions"><button data-restore class="lt-secondary">${t('exitAndClear')}</button><button data-settings class="lt-quiet">${t('settings')}</button></div>`, true);
+      if (panelMode === 'immersive') {
+        root.replaceChildren();
+        root.hidden = true;
+        root.className = '';
+        panelMode = '';
+      }
     }
   } finally {
     state.inFlight -= 1;
+    updateImmersiveBallActivity(state.active && state.inFlight > 0);
     if (state.active) {
       updateImmersiveStatus(state);
       scheduleVisibleBatch(state);
@@ -693,6 +860,7 @@ function pauseImmersive() {
   const state = immersiveState;
   if (!state) return;
   state.active = false;
+  updateImmersiveBallActivity(false);
   state.observer?.disconnect();
   clearTimeout(state.flushTimer);
   clearTimeout(state.scrollTimer);
@@ -701,7 +869,6 @@ function pauseImmersive() {
   state.controller.abort();
   state.loading.forEach(removeLoadingPlaceholder);
   state.loading.clear();
-  showImmersive(`<div class="lt-control-title"><b data-immersive-title>${t('paused')}</b><span data-progress>${state.done.size} / ${state.items.length}</span></div><div class="lt-control-actions"><button data-resume>${t('resume')}</button><button data-restore class="lt-secondary">${t('exitTranslation')}</button><button data-settings class="lt-quiet">${t('settings')}</button></div>`);
 }
 
 function resumeImmersive() {
@@ -713,7 +880,6 @@ function resumeImmersive() {
   state.queuedIds = new Set(state.done);
   state.scrollIdle = true;
   window.addEventListener('scroll', state.scrollHandler, { passive: true });
-  showImmersive(`<div class="lt-control-title"><b data-immersive-title>${t('continueOnScroll')}</b><span data-progress>${state.done.size} / ${state.items.length}</span></div><div class="lt-control-actions"><button data-stop>${t('pause')}</button><button data-restore class="lt-secondary">${t('exitTranslation')}</button><button data-settings class="lt-quiet">${t('settings')}</button></div>`);
   observeRemaining(state);
 }
 
@@ -721,10 +887,9 @@ async function immersive() {
   await localeReady;
   if (immersiveState) return;
   const cfg = await settings();
-  immersiveStatusEnabled = cfg.showImmersiveStatus === true;
   const nodes = blocks(cfg);
   if (!nodes.length) {
-    showImmersive(`<div class="lt-head"><b>${t('noContent')}</b><button data-dismiss>×</button></div>`, true);
+    updateImmersiveBallActivity(false);
     return;
   }
   const items = nodes.map((source, index) => ({ id: `p-${index}`, source, text: source.innerText.replace(/\s+/g, ' ').trim() }));
@@ -765,7 +930,6 @@ async function immersive() {
     }, SCROLL_IDLE_MS);
   };
   immersiveState = state;
-  showImmersive(`<div class="lt-control-title"><b data-immersive-title>${t('continueOnScroll')}</b><span data-progress>0 / ${items.length}</span></div><div class="lt-control-actions"><button data-stop>${t('pause')}</button><button data-restore class="lt-secondary">${t('exitTranslation')}</button><button data-settings class="lt-quiet">${t('settings')}</button></div>`);
   window.addEventListener('scroll', state.scrollHandler, { passive: true });
   observeRemaining(state);
   observeDynamicContent(state);
@@ -777,23 +941,26 @@ function toggleImmersive() {
 
 function onSelectionMouseup(event) {
   if (event.target.closest?.('#lt-root,#lt-trigger')) return;
-  const text = liveSelectionText();
   const selectionPanelVisible = panelMode === 'selection' && !root.hidden;
-  if (!text) {
-    triggerVersion += 1;
-    clearTimeout(triggerTimer);
-    triggerTimer = null;
-    selectedText = '';
-    hideTrigger();
-    if (selectionPanelVisible) closeSelection();
-    return;
-  }
   if (selectionPanelVisible) closeSelection();
-  scheduleTrigger(event);
+  const selection = document.getSelection();
+  const text = selectionInsideExtensionUi() ? '' : liveSelectionText();
+  let anchor = lastSelectionAnchor;
+  if (selection && text && selection.rangeCount) {
+    const range = selection.getRangeAt(0);
+    const rects = [...range.getClientRects()];
+    const rect = rects.at(-1) || range.getBoundingClientRect();
+    anchor = { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom };
+    lastSelectedText = text;
+    lastSelectionAt = performance.now();
+    lastSelectionAnchor = anchor;
+  }
+  scheduleTrigger(event, anchor);
 }
 
 function onSelectionChange() {
   if (liveSelectionText()) return;
+  if (triggerTimer) return;
   triggerVersion += 1;
   clearTimeout(triggerTimer);
   triggerTimer = null;
@@ -803,10 +970,10 @@ function onSelectionChange() {
 
 function setSelectionTriggerEnabled(enabled) {
   selectionTriggerEnabled = enabled;
-  document.removeEventListener('mouseup', onSelectionMouseup);
+  document.removeEventListener('mouseup', onSelectionMouseup, true);
   document.removeEventListener('selectionchange', onSelectionChange);
   if (enabled) {
-    document.addEventListener('mouseup', onSelectionMouseup);
+    document.addEventListener('mouseup', onSelectionMouseup, true);
     document.addEventListener('selectionchange', onSelectionChange);
   } else {
     triggerVersion += 1;
@@ -819,22 +986,38 @@ function setSelectionTriggerEnabled(enabled) {
 
 document.addEventListener('contextmenu', event => {
   lastContextMenuPoint = { x: event.clientX, y: event.clientY, at: performance.now() };
-}, true);
-
-function translateCurrentSelection(source = 'shortcut') {
   const selection = document.getSelection();
   const text = liveSelectionText();
-  if (!selection || !text) return;
-  const range = selection.getRangeAt(0);
-  const rects = [...range.getClientRects()];
-  const rect = rects.at(-1) || range.getBoundingClientRect();
+  if (selection && text && !selectionInsideExtensionUi()) {
+    const range = selection.getRangeAt(0);
+    const rects = [...range.getClientRects()];
+    const rect = rects.at(-1) || range.getBoundingClientRect();
+    lastSelectedText = text;
+    lastSelectionAt = performance.now();
+    lastSelectionAnchor = { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom };
+  }
+}, true);
+
+function translateCurrentSelection(source = 'shortcut', suppliedText = '') {
+  const selection = document.getSelection();
+  const liveText = selectionInsideExtensionUi() ? '' : liveSelectionText();
+  const recentText = performance.now() - lastSelectionAt <= 10000 ? lastSelectedText : '';
+  const text = String(suppliedText || liveText || recentText).trim();
+  if (!text) return;
+  let anchor = lastSelectionAnchor;
+  if (selection && liveText && selection.rangeCount) {
+    const range = selection.getRangeAt(0);
+    const rects = [...range.getClientRects()];
+    const rect = rects.at(-1) || range.getBoundingClientRect();
+    anchor = { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom };
+  }
   const recentContextPoint = source === 'context-menu' && lastContextMenuPoint && performance.now() - lastContextMenuPoint.at < 3000
     ? lastContextMenuPoint
     : null;
   selectionPosition = null;
   selectionAnchor = recentContextPoint
     ? { left: recentContextPoint.x, right: recentContextPoint.x, top: recentContextPoint.y, bottom: recentContextPoint.y }
-    : { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom };
+    : anchor || { left: window.innerWidth / 2, right: window.innerWidth / 2, top: window.innerHeight / 3, bottom: window.innerHeight / 3 };
   hideTrigger({ immediate: true });
   selectionTranslate(text);
 }
@@ -844,9 +1027,8 @@ document.addEventListener('pointerdown', event => {
 }, true);
 
 const openFromHover = () => {
-  const text = liveSelectionText();
+  const text = selectedText;
   if (!text) {
-    selectedText = '';
     hideTrigger();
     clearTimeout(hoverTimer);
     return;
@@ -855,14 +1037,8 @@ const openFromHover = () => {
   if (panelMode === 'selection' && !root.hidden) return;
   clearTimeout(hoverTimer);
   hoverTimer = setTimeout(() => {
-    const current = liveSelectionText();
-    if (!current) {
-      selectedText = '';
-      hideTrigger();
-      return;
-    }
-    selectedText = current;
-    selectionTranslate(current);
+    if (!selectedText) return;
+    selectionTranslate(selectedText);
   }, HOVER_INTENT_MS);
 };
 trigger.addEventListener('pointerenter', openFromHover);
@@ -900,6 +1076,7 @@ root.addEventListener('pointerup', stopPanelDrag);
 root.addEventListener('pointercancel', stopPanelDrag);
 
 window.addEventListener('resize', () => {
+  if (immersiveBallEnabled && !immersiveBall.hidden) placeImmersiveBall({ left: parseFloat(immersiveBall.style.left), top: parseFloat(immersiveBall.style.top) });
   if (panelMode !== 'selection' || !selectionPosition) return;
   const rect = root.getBoundingClientRect();
   selectionPosition.left = Math.min(window.innerWidth - rect.width - 8, Math.max(8, selectionPosition.left));
@@ -921,15 +1098,19 @@ document.addEventListener('click', event => {
   if (event.target.matches('[data-stop]') && immersiveState) chrome.runtime.sendMessage({ type: 'broadcast-immersive', action: 'pause' });
   if (event.target.matches('[data-restore]')) chrome.runtime.sendMessage({ type: 'broadcast-immersive', action: 'restore' });
   if (event.target.matches('[data-resume]')) chrome.runtime.sendMessage({ type: 'broadcast-immersive', action: 'resume' });
-  if (event.target.matches('[data-settings]')) chrome.runtime.openOptionsPage();
+  if (event.target.matches('[data-settings]')) chrome.runtime.sendMessage({ type: 'open-options-page' });
   if (event.target.matches('[data-dismiss]') && panelMode === 'immersive') {
     root.hidden = true;
     panelMode = '';
   }
 });
 
-chrome.runtime.onMessage.addListener(message => {
-  if (message.type === 'translate-selection') translateCurrentSelection(message.source);
+chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  if (message.type === 'get-selected-text') {
+    sendResponse(selectedPageText());
+    return;
+  }
+  if (message.type === 'translate-selection') translateCurrentSelection(message.source, message.text);
   else if (message.type === 'toggle-immersive') toggleImmersive();
   else if (message.type === 'immersive-translate' || message.type === 'immersive-start') immersive();
   else if (message.type === 'immersive-restore') restoreImmersive();
@@ -941,6 +1122,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
   if (area !== 'local') return;
   if (changes.touchGesture) touchGesture = changes.touchGesture.newValue || 'disabled';
   if (changes.enableSelectionTrigger) setSelectionTriggerEnabled(changes.enableSelectionTrigger.newValue !== false);
+  if (changes.showImmersiveBall || changes.immersiveBallPosition) setImmersiveBallEnabled(changes.showImmersiveBall?.newValue ?? immersiveBallEnabled, changes.immersiveBallPosition?.newValue);
   if (!changes.uiLanguage) return;
   i18n.load(changes.uiLanguage.newValue || 'auto').then(() => {
     const replacements = [

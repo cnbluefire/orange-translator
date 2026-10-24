@@ -15,6 +15,8 @@ function close(root, focus = false) {
   const menu = root?.querySelector('[data-combobox-menu]');
   if (!button || !menu) return;
   menu.hidden = true;
+  menu.style.removeProperty('max-height');
+  root.classList.remove('is-upward');
   button.setAttribute('aria-expanded', 'false');
   if (focus) button.focus();
 }
@@ -23,7 +25,18 @@ function open(root, focusOption = false) {
   document.querySelectorAll('[data-combobox-root]').forEach(other => { if (other !== root) close(other); });
   const button = root.querySelector('[data-combobox-button]');
   const menu = root.querySelector('[data-combobox-menu]');
+  root.classList.remove('is-upward');
   menu.hidden = false;
+  const buttonRect = button.getBoundingClientRect();
+  const gap = 5;
+  const edge = 8;
+  const spaceBelow = Math.max(0, window.innerHeight - buttonRect.bottom - gap - edge);
+  const spaceAbove = Math.max(0, buttonRect.top - gap - edge);
+  const preferredHeight = Math.min(menu.scrollHeight, 280);
+  const upward = spaceBelow < preferredHeight && spaceAbove > spaceBelow;
+  const available = upward ? spaceAbove : spaceBelow;
+  if (upward) root.classList.add('is-upward');
+  menu.style.maxHeight = `${Math.max(36, Math.min(preferredHeight, available))}px`;
   button.setAttribute('aria-expanded', 'true');
   const selected = menu.querySelector('.is-selected');
   selected?.scrollIntoView({ block: 'nearest' });
