@@ -9,6 +9,8 @@ globalThis.LiteTranslate = (() => {
     azureRegion: '',
     googleKey: '',
     showImmersiveStatus: false,
+    enableSelectionTrigger: true,
+    touchGesture: 'disabled',
     translationTheme: 'opacity',
     uiLanguage: 'auto',
     targetLanguage: 'zh-CN',

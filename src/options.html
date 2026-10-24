@@ -2,10 +2,12 @@
 <meta charset="utf-8">
 <title data-i18n="settingsTitle">橙竟是翻译</title>
 <link rel="stylesheet" href="ui.css">
+<link id="mobile-styles" rel="stylesheet" href="mobile.css" media="not all">
+<script src="mobile-ui.js"></script>
 <script src="i18n.js"></script>
 <main class="settings settings-shell">
   <header class="settings-header">
-    <div class="settings-title"><span class="brand" data-i18n="settingsTitle">橙竟是翻译</span><span class="pill">v0.1.1</span></div>
+    <div class="settings-title"><span class="brand" data-i18n="settingsTitle">橙竟是翻译</span><span class="pill">v0.1.2</span></div>
   </header>
 
   <section class="settings-card">
@@ -65,6 +67,15 @@
   </section>
 
   <section class="settings-card">
+    <div class="card-head"><h2 data-i18n="selectionTranslation">划词翻译</h2></div>
+    <label class="switch-row">
+      <span><b data-i18n="selectionTrigger">显示划词翻译图标</b><small data-i18n="selectionTriggerHelp">选中文字后，在选区旁显示橙子图标。关闭后仍可使用右键菜单或浏览器快捷键翻译选中文本。</small></span>
+      <input id="enableSelectionTrigger" type="checkbox" role="switch">
+    </label>
+    <button id="open-shortcuts" class="secondary" data-i18n="openShortcuts">打开浏览器快捷键设置</button>
+  </section>
+
+  <section class="settings-card">
     <div class="card-head"><h2 data-i18n="immersiveTranslation">沉浸式翻译</h2></div>
     <div class="field-label" data-i18n="translationStyle">译文样式</div>
     <div class="theme-select">
@@ -100,12 +111,20 @@
       <p class="theme-preview-source">Reading connects us with ideas from around the world.</p>
       <p class="theme-preview-translation" data-i18n="previewTranslation">阅读让我们与世界各地的思想相连。</p>
     </div>
+    <label><span data-i18n="touchGesture">触屏翻译快捷方式</span>
+      <select id="touchGesture" data-combobox>
+        <option value="disabled" data-i18n="touchDisabled">禁用</option>
+        <option value="two" data-i18n="touchTwo">双指轻触</option>
+        <option value="three" data-i18n="touchThree">三指轻触</option>
+        <option value="four" data-i18n="touchFour">四指轻触</option>
+      </select>
+    </label>
+    <p class="section-help" data-i18n="touchGestureHelp">在触屏页面上用所选手势切换沉浸式翻译。</p>
     <label class="switch-row">
       <span><b data-i18n="showProgressPanel">显示翻译进度浮窗</b><small data-i18n="showProgressPanelHelp">在页面右上角显示翻译进度、暂停和退出按钮。</small></span>
       <input id="showImmersiveStatus" type="checkbox" role="switch">
     </label>
     <p class="section-help" data-i18n="progressDefaultOff">默认关闭。接口错误仍会显示提示。</p>
-    <button id="open-shortcuts" class="secondary" data-i18n="openShortcuts">打开浏览器快捷键设置</button>
   </section>
 
   <section class="settings-card">

@@ -13,7 +13,10 @@ async function createContextMenus() {
   chrome.contextMenus.create({ id: 'quick-translate', title: text.selection, contexts: ['selection'] });
   chrome.contextMenus.create({ id: 'immersive-translate', title: text.immersive, contexts: ['page'] });
 }
-chrome.runtime.onInstalled.addListener(createContextMenus);
+chrome.runtime.onInstalled.addListener(async details => {
+  await createContextMenus();
+  if (details.reason === 'install') await chrome.runtime.openOptionsPage();
+});
 chrome.runtime.onStartup.addListener(createContextMenus);
 chrome.storage.onChanged.addListener((changes, area) => { if (area === 'local' && changes.uiLanguage) createContextMenus(); });
 const immersiveTabs = new Set();
@@ -77,12 +80,16 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
   if (!tab?.id) return;
   const type = info.menuItemId === 'quick-translate' ? 'translate-selection' : 'immersive-translate';
   if (type === 'immersive-translate') controlImmersive(tab.id, 'start');
-  else chrome.tabs.sendMessage(tab.id, { type }).catch(() => {});
+  else sendToAllFrames(tab.id, { type, source: 'context-menu' });
 });
 chrome.commands.onCommand.addListener(async command => {
-  if (command !== 'toggle-immersive') return;
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  if (tab?.id) controlImmersive(tab.id, immersiveTabs.has(tab.id) ? 'restore' : 'start');
+  if (!tab?.id) return;
+  if (command === 'translate-selection') {
+    sendToAllFrames(tab.id, { type: 'translate-selection', source: 'shortcut' });
+    return;
+  }
+  if (command === 'toggle-immersive') controlImmersive(tab.id, immersiveTabs.has(tab.id) ? 'restore' : 'start');
 });
 chrome.runtime.onMessage.addListener((message, sender) => {
   if (message?.type === 'open-pdf-viewer') return openPdfViewer(message.url || '', message.useCurrentUrl === true);

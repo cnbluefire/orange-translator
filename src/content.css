@@ -96,7 +96,6 @@
 .lt-card button.lt-original-toggle { color:var(--lt-accent); }
 .lt-loading { background:var(--lt-accent); }
 .lt-selection-result { border-left-color:var(--lt-accent); color:var(--lt-text); }
-.lt-translated.lt-immersive-translation { text-decoration-color:currentColor !important; }
 @media (prefers-color-scheme: dark) {
   #lt-root, #lt-trigger { --lt-accent:#ff8a3d; --lt-accent-hover:#ff9f5f; --lt-soft:#422719; --lt-surface:#24211f; --lt-surface-alt:#2d2926; --lt-text:#f4ede7; --lt-muted:#b9ada4; --lt-border:#403a35; }
   .lt-card { box-shadow:0 10px 36px #0008; }

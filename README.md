@@ -1,11 +1,14 @@
 # 橙竟是翻译（Orange Translator）
 
+[![Microsoft Edge Add-ons](https://img.shields.io/badge/Microsoft%20Edge-获取扩展-0078D7?logo=microsoftedge&logoColor=white)](https://microsoftedge.microsoft.com/addons/detail/%E6%A9%99%E7%AB%9F%E6%98%AF%E7%BF%BB%E8%AF%91/ekodakiiajjeaklellnlnahnhfaeabjn)
+
 一款 Chrome/Edge Manifest V3 翻译扩展，提供划词翻译、文本翻译、双语网页翻译和内置 PDF.js 阅读器。
 
 ## 功能
 
 - 选中文字后，在选区附近显示橙子图标，悬停即可翻译。
 - 保留原文的双语网页翻译，支持滚动懒加载、动态 DOM、iframe、暂停和退出。
+- 可选双指、三指或四指轻触，在触屏设备上快速切换沉浸式翻译；该功能默认关闭。
 - 内置多种译文样式及实时双语预览。
 - 内置 PDF.js 阅读器，保留 PDF 原始排版并支持在 Text Layer 中划词翻译。
 - 默认使用无需 Key 的 Microsoft 翻译，失败时可回退到 Google 翻译。

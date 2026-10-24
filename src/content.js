@@ -33,11 +33,52 @@ let panelAnimationTimer = null;
 let triggerVersion = 0;
 let selectionPosition = null;
 let selectionAnchor = null;
+let lastContextMenuPoint = null;
 let panelDrag = null;
 let immersiveStatusEnabled = false;
+let selectionTriggerEnabled = true;
+let touchGesture = 'disabled';
+let touchCandidate = null;
 const HOVER_INTENT_MS = 500;
 const SCROLL_IDLE_MS = 280;
 let ruleStyle = null;
+
+settings().then(cfg => {
+  touchGesture = cfg.touchGesture || 'disabled';
+  setSelectionTriggerEnabled(cfg.enableSelectionTrigger !== false);
+}).catch(() => {});
+
+const TOUCH_COUNTS = { two: 2, three: 3, four: 4 };
+document.addEventListener('touchstart', event => {
+  const required = TOUCH_COUNTS[touchGesture];
+  if (!required || event.touches.length !== required || event.target.closest?.('#lt-root,#lt-trigger')) {
+    touchCandidate = null;
+    return;
+  }
+  touchCandidate = {
+    count: required,
+    startedAt: performance.now(),
+    points: [...event.touches].map(touch => ({ id: touch.identifier, x: touch.clientX, y: touch.clientY })),
+    ended: new Set(),
+    moved: false
+  };
+}, { passive: true });
+document.addEventListener('touchmove', event => {
+  if (!touchCandidate) return;
+  for (const touch of event.touches) {
+    const start = touchCandidate.points.find(point => point.id === touch.identifier);
+    if (!start || Math.hypot(touch.clientX - start.x, touch.clientY - start.y) > 18) { touchCandidate.moved = true; break; }
+  }
+}, { passive: true });
+document.addEventListener('touchend', event => {
+  if (!touchCandidate) return;
+  for (const touch of event.changedTouches) touchCandidate.ended.add(touch.identifier);
+  if (event.touches.length) return;
+  const candidate = touchCandidate;
+  touchCandidate = null;
+  if (!candidate.moved && performance.now() - candidate.startedAt <= 500 && candidate.ended.size === candidate.count) toggleImmersive();
+}, { passive: true });
+document.addEventListener('touchcancel', () => { touchCandidate = null; }, { passive: true });
 
 const esc = value => String(value).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
 
@@ -64,7 +105,7 @@ function placeSelectionPanel() {
 function showSelection(html) {
   const firstOpen = panelMode !== 'selection' || root.hidden;
   const entering = root.classList.contains('lt-panel-enter');
-  if (panelMode !== 'selection' || !selectionAnchor) {
+  if (!selectionAnchor) {
     const rect = trigger.getBoundingClientRect();
     selectionAnchor = { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom };
   }
@@ -734,7 +775,7 @@ function toggleImmersive() {
   if (IS_TOP_FRAME) chrome.runtime.sendMessage({ type: 'broadcast-immersive', action: 'toggle' });
 }
 
-document.addEventListener('mouseup', event => {
+function onSelectionMouseup(event) {
   if (event.target.closest?.('#lt-root,#lt-trigger')) return;
   const text = liveSelectionText();
   const selectionPanelVisible = panelMode === 'selection' && !root.hidden;
@@ -749,16 +790,58 @@ document.addEventListener('mouseup', event => {
   }
   if (selectionPanelVisible) closeSelection();
   scheduleTrigger(event);
-});
+}
 
-document.addEventListener('selectionchange', () => {
+function onSelectionChange() {
   if (liveSelectionText()) return;
   triggerVersion += 1;
   clearTimeout(triggerTimer);
   triggerTimer = null;
   selectedText = '';
   if (panelMode !== 'selection') hideTrigger();
-});
+}
+
+function setSelectionTriggerEnabled(enabled) {
+  selectionTriggerEnabled = enabled;
+  document.removeEventListener('mouseup', onSelectionMouseup);
+  document.removeEventListener('selectionchange', onSelectionChange);
+  if (enabled) {
+    document.addEventListener('mouseup', onSelectionMouseup);
+    document.addEventListener('selectionchange', onSelectionChange);
+  } else {
+    triggerVersion += 1;
+    clearTimeout(triggerTimer);
+    triggerTimer = null;
+    selectedText = '';
+    hideTrigger({ immediate: true });
+  }
+}
+
+document.addEventListener('contextmenu', event => {
+  lastContextMenuPoint = { x: event.clientX, y: event.clientY, at: performance.now() };
+}, true);
+
+function translateCurrentSelection(source = 'shortcut') {
+  const selection = document.getSelection();
+  const text = liveSelectionText();
+  if (!selection || !text) return;
+  const range = selection.getRangeAt(0);
+  const rects = [...range.getClientRects()];
+  const rect = rects.at(-1) || range.getBoundingClientRect();
+  const recentContextPoint = source === 'context-menu' && lastContextMenuPoint && performance.now() - lastContextMenuPoint.at < 3000
+    ? lastContextMenuPoint
+    : null;
+  selectionPosition = null;
+  selectionAnchor = recentContextPoint
+    ? { left: recentContextPoint.x, right: recentContextPoint.x, top: recentContextPoint.y, bottom: recentContextPoint.y }
+    : { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom };
+  hideTrigger({ immediate: true });
+  selectionTranslate(text);
+}
+
+document.addEventListener('pointerdown', event => {
+  if (panelMode === 'selection' && !root.hidden && !event.target.closest?.('#lt-root')) closeSelection();
+}, true);
 
 const openFromHover = () => {
   const text = liveSelectionText();
@@ -846,7 +929,7 @@ document.addEventListener('click', event => {
 });
 
 chrome.runtime.onMessage.addListener(message => {
-  if (message.type === 'translate-selection') selectionTranslate(getSelection()?.toString() || selectedText);
+  if (message.type === 'translate-selection') translateCurrentSelection(message.source);
   else if (message.type === 'toggle-immersive') toggleImmersive();
   else if (message.type === 'immersive-translate' || message.type === 'immersive-start') immersive();
   else if (message.type === 'immersive-restore') restoreImmersive();
@@ -855,7 +938,10 @@ chrome.runtime.onMessage.addListener(message => {
 });
 
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (area !== 'local' || !changes.uiLanguage) return;
+  if (area !== 'local') return;
+  if (changes.touchGesture) touchGesture = changes.touchGesture.newValue || 'disabled';
+  if (changes.enableSelectionTrigger) setSelectionTriggerEnabled(changes.enableSelectionTrigger.newValue !== false);
+  if (!changes.uiLanguage) return;
   i18n.load(changes.uiLanguage.newValue || 'auto').then(() => {
     const replacements = [
       ['[data-toggle-original]', root.querySelector('[data-original]')?.classList.contains('is-expanded') ? 'collapseOriginal' : 'expandOriginal'],

@@ -1,6 +1,8 @@
 <!doctype html>
 <meta charset="utf-8">
 <link rel="stylesheet" href="ui.css">
+<link id="mobile-styles" rel="stylesheet" href="mobile.css" media="not all">
+<script src="mobile-ui.js"></script>
 <script src="i18n.js"></script>
 <style>
   .icon-button {
@@ -42,6 +44,5 @@
   <header class="app-header"><div><div class="brand" data-i18n="appName">橙竟是翻译</div><div class="subtitle" data-i18n="popupSubtitle">划词 · 文本 · 沉浸式翻译</div></div><button id="options" class="icon-button" title="设置" data-i18n-title="settings">⚙</button></header>
   <section class="quick-card"><label for="query" data-i18n="quickTranslation">快速翻译</label><textarea id="query" rows="4" placeholder="输入单词、短语或句子…" data-i18n-placeholder="queryPlaceholder"></textarea><div class="quick-actions"><select id="quick-target" data-combobox></select><button id="translate" data-i18n="translate">翻译</button></div><div id="result" class="quick-result" hidden></div></section>
   <section class="action-list"><button id="page" class="action-item"><span>文</span><div><b data-i18n="immersiveTranslation">沉浸式翻译</b><small data-i18n="immersiveActionHelp">翻译当前视口和下方一屏</small></div><i>›</i></button><button id="pdf" class="action-item"><span>PDF</span><div><b data-i18n="manualPdf">手动翻译 PDF</b><small data-i18n="pdfActionHelp">不会自动接管浏览器 PDF</small></div><i>›</i></button></section>
-  <footer data-i18n="popupFooter">选中文本后，移动到选区旁的译图标即可翻译</footer>
 </main>
 <script type="module" src="popup.js"></script>

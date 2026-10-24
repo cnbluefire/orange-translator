@@ -55,7 +55,7 @@ try {
   await gotoExtensionPage(options, 'options.html');
   await options.locator('#provider').waitFor({ state: 'visible' });
   const enhancedComboboxes = await options.locator('[data-combobox-root]').count();
-  if (enhancedComboboxes !== 5) throw new Error(`设置页应有 5 个统一下拉组件，实际为 ${enhancedComboboxes}`);
+  if (enhancedComboboxes !== 6) throw new Error(`设置页应有 6 个统一下拉组件，实际为 ${enhancedComboboxes}`);
   await options.locator('#targetLanguage').evaluate(select => select.closest('[data-combobox-root]').querySelector('[data-combobox-button]').click());
   const languageMenuStyle = await options.locator('#targetLanguage').evaluate(select => {
     const menu = select.closest('[data-combobox-root]').querySelector('[data-combobox-menu]');
@@ -64,6 +64,9 @@ try {
   });
   if (languageMenuStyle.maxHeight !== '280px' || languageMenuStyle.overflowY !== 'auto') throw new Error(`语言下拉菜单未统一限高：${JSON.stringify(languageMenuStyle)}`);
   await options.keyboard.press('Escape');
+  await options.setViewportSize({ width: 225, height: 844 });
+  if (await options.evaluate(() => document.documentElement.classList.contains('lt-mobile-ui'))) throw new Error('桌面 UA 在窄窗口下错误启用了移动版设置样式');
+  await options.setViewportSize({ width: 1280, height: 900 });
 
   await options.locator('#uiLanguage').selectOption('en');
   await options.waitForFunction(async () => (await chrome.storage.local.get('uiLanguage')).uiLanguage === 'en');
@@ -118,6 +121,9 @@ try {
   });
   if (popupLanguageMenu.maxHeight !== '280px' || popupLanguageMenu.overflowY !== 'auto') throw new Error(`弹窗语言菜单未统一限高：${JSON.stringify(popupLanguageMenu)}`);
   await popupVisual.keyboard.press('Escape');
+  await popupVisual.setViewportSize({ width: 225, height: 844 });
+  if (await popupVisual.evaluate(() => document.documentElement.classList.contains('lt-mobile-ui'))) throw new Error('桌面 UA 在窄窗口下错误启用了移动版弹窗样式');
+  await popupVisual.setViewportSize({ width: 390, height: 844 });
   const lightVisual = await popupVisual.evaluate(() => {
     const gear = getComputedStyle(document.querySelector('#options'));
     const shell = getComputedStyle(document.querySelector('.popup-shell'));
@@ -213,6 +219,59 @@ try {
   await testProvider(provider);
   const page = await context.newPage();
   await page.goto(url);
+  await worker.evaluate(() => chrome.storage.local.set({ enableSelectionTrigger: false }));
+  await page.waitForTimeout(250);
+  await page.evaluate(() => {
+    const range = document.createRange();
+    range.selectNodeContents(document.querySelector('#p1'));
+    const selection = getSelection();
+    selection.removeAllRanges(); selection.addRange(range);
+    document.querySelector('#p1').dispatchEvent(new MouseEvent('mouseup', { bubbles: true, clientX: 320, clientY: 180 }));
+  });
+  await page.waitForTimeout(300);
+  if (await page.locator('#lt-trigger').isVisible()) throw new Error('关闭划词图标后 mouseup 仍显示了悬浮图标');
+  await broadcastToFrames('http://127.0.0.1:', 'translate-selection');
+  await page.locator('#lt-root:not([hidden])').waitFor({ timeout: 5000 });
+  await page.waitForTimeout(260);
+  if (!(await page.locator('#lt-root').textContent())?.includes('原文')) throw new Error('关闭划词图标后快捷键/右键入口没有直接打开翻译浮窗');
+  const directPanelBox = await page.locator('#lt-root').boundingBox();
+  const selectedBox = await page.locator('#p1').boundingBox();
+  if (!directPanelBox || !selectedBox || Math.abs(directPanelBox.x - selectedBox.x) > 40 || directPanelBox.y < selectedBox.y - 20 || directPanelBox.y > selectedBox.y + selectedBox.height + 60) throw new Error(`无悬浮图标时翻译浮窗没有靠近选区：${JSON.stringify({ directPanelBox, selectedBox })}`);
+  await page.locator('body').click({ position: { x: 8, y: 8 }, force: true });
+  await page.locator('#lt-root').waitFor({ state: 'hidden', timeout: 5000 });
+  await worker.evaluate(() => chrome.storage.local.set({ enableSelectionTrigger: true }));
+  await page.waitForTimeout(250);
+  console.log('PASS selection trigger switch: mouse listener disabled, direct command unaffected');
+  await worker.evaluate(() => chrome.storage.local.set({ touchGesture: 'three' }));
+  await page.waitForTimeout(250);
+  await page.evaluate(() => {
+    const target = document.querySelector('main');
+    const points = [
+      new Touch({ identifier: 1, target, clientX: 80, clientY: 80 }),
+      new Touch({ identifier: 2, target, clientX: 110, clientY: 80 }),
+      new Touch({ identifier: 3, target, clientX: 140, clientY: 80 })
+    ];
+    target.dispatchEvent(new TouchEvent('touchstart', { bubbles: true, touches: points, targetTouches: points, changedTouches: points }));
+    target.dispatchEvent(new TouchEvent('touchend', { bubbles: true, touches: [], targetTouches: [], changedTouches: points }));
+  });
+  await page.waitForFunction(() => document.querySelector('.lt-immersive-translation') || document.querySelector('#lt-root')?.textContent?.includes('翻译失败'), null, { timeout: 90000 });
+  if (!await page.locator('.lt-immersive-translation').count()) throw new Error('三指轻触没有触发沉浸式翻译');
+  const coloredThemeStyle = await page.locator('.lt-immersive-translation').first().evaluate(node => {
+    node.parentElement.style.color = 'rgb(35, 90, 210)';
+    node.dataset.ltTheme = 'wavy';
+    const wavy = getComputedStyle(node);
+    const result = { textColor: wavy.color, wavyColor: wavy.textDecorationColor, wavyStyle: wavy.textDecorationStyle };
+    node.dataset.ltTheme = 'nativeDashed';
+    const dashed = getComputedStyle(node);
+    result.dashedColor = dashed.textDecorationColor;
+    result.dashedStyle = dashed.textDecorationStyle;
+    return result;
+  });
+  if (coloredThemeStyle.textColor !== 'rgb(35, 90, 210)' || coloredThemeStyle.wavyColor !== 'rgb(114, 236, 233)' || coloredThemeStyle.wavyStyle !== 'wavy' || coloredThemeStyle.dashedColor !== 'rgb(114, 236, 233)' || coloredThemeStyle.dashedStyle !== 'dashed') throw new Error(`彩色原文覆盖了译文装饰线样式：${JSON.stringify(coloredThemeStyle)}`);
+  console.log('PASS translation themes: colored source text does not override decoration colors');
+  await broadcastToFrames('http://127.0.0.1:', 'immersive-restore');
+  await page.waitForFunction(() => document.querySelectorAll('.lt-immersive-translation').length === 0, null, { timeout: 10000 });
+  console.log('PASS touch gesture: three-finger tap toggles immersive translation');
   await page.evaluate(() => {
     const range = document.createRange();
     range.selectNodeContents(document.querySelector('#p1'));
@@ -470,8 +529,11 @@ try {
 
   const commands = await worker.evaluate(() => chrome.commands.getAll());
   const toggleCommand = commands.find(command => command.name === 'toggle-immersive');
+  const selectionCommand = commands.find(command => command.name === 'translate-selection');
   if (!toggleCommand) throw new Error(`沉浸式翻译快捷键命令未注册：${JSON.stringify(commands)}`);
+  if (!selectionCommand) throw new Error(`划词翻译快捷键命令未注册：${JSON.stringify(commands)}`);
   if (toggleCommand.shortcut) throw new Error(`沉浸式翻译不应预设快捷键：${JSON.stringify(commands)}`);
+  if (selectionCommand.shortcut) throw new Error(`划词翻译不应预设快捷键：${JSON.stringify(commands)}`);
   await broadcastToFrames('https://github.com/cnbluefire/indra-ocr-sharp', 'immersive-restore');
   await github.waitForFunction(() => document.querySelectorAll('.lt-immersive-translation').length === 0, null, { timeout: 10000 });
   console.log('PASS immersive shortcut entry: configurable, no default binding');
