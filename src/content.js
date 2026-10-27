@@ -6,12 +6,12 @@ const localeReady = i18n.init();
 const t = (key, values) => i18n.t(key, values);
 
 const root = document.createElement('div');
-root.id = 'lt-root';
+root.id = 'orange-translator-extension-9443e25e-root';
 root.hidden = true;
 document.documentElement.append(root);
 
 const trigger = document.createElement('button');
-trigger.id = 'lt-trigger';
+trigger.id = 'orange-translator-extension-9443e25e-trigger';
 trigger.type = 'button';
 const triggerIcon = document.createElement('img');
 triggerIcon.src = chrome.runtime.getURL('icons/icon.svg');
@@ -22,7 +22,7 @@ trigger.hidden = true;
 document.documentElement.append(trigger);
 
 const immersiveBall = document.createElement('button');
-immersiveBall.id = 'lt-immersive-ball';
+immersiveBall.id = 'orange-translator-extension-9443e25e-immersive-ball';
 immersiveBall.type = 'button';
 immersiveBall.hidden = true;
 immersiveBall.innerHTML = `<img src="${chrome.runtime.getURL('icons/icon.svg')}" alt="">`;
@@ -38,15 +38,12 @@ let immersiveState = null;
 let youtubeSubtitleState = null;
 let hoverTimer = null;
 let triggerTimer = null;
-let triggerAnimationTimer = null;
-let panelAnimationTimer = null;
 let triggerVersion = 0;
 let selectionPosition = null;
 let selectionAnchor = null;
 let lastSelectionAnchor = null;
 let lastContextMenuPoint = null;
 let panelDrag = null;
-let selectionTriggerEnabled = true;
 let immersiveBallEnabled = false;
 let immersiveBallDrag = null;
 let immersiveBallSpinStartedAt = 0;
@@ -66,7 +63,7 @@ settings().then(cfg => {
 
 const TOUCH_COUNTS = { two: 2, three: 3, four: 4 };
 document.addEventListener('pointerdown', event => {
-  if (event.pointerType !== 'touch' || event.target.closest?.('#lt-root,#lt-trigger,#lt-immersive-ball')) return;
+  if (event.pointerType !== 'touch' || event.target.closest?.('#orange-translator-extension-9443e25e-root,#orange-translator-extension-9443e25e-trigger,#orange-translator-extension-9443e25e-immersive-ball')) return;
   const required = TOUCH_COUNTS[touchGesture];
   if (!required) return;
   activeTouchPointers.set(event.pointerId, { x: event.clientX, y: event.clientY, moved: false });
@@ -119,24 +116,24 @@ function updateImmersiveBallActivity(active) {
   clearTimeout(immersiveBallSpinStopTimer);
   immersiveBallSpinStopTimer = null;
   if (active) {
-    if (!immersiveBall.classList.contains('is-translating')) {
+    if (!immersiveBall.classList.contains('orange-translator-extension-9443e25e-state-translating')) {
       immersiveBallSpinStartedAt = performance.now();
-      immersiveBall.classList.add('is-translating');
+      immersiveBall.classList.add('orange-translator-extension-9443e25e-state-translating');
     }
     return;
   }
-  if (!immersiveBall.classList.contains('is-translating')) return;
+  if (!immersiveBall.classList.contains('orange-translator-extension-9443e25e-state-translating')) return;
   const elapsed = performance.now() - immersiveBallSpinStartedAt;
   const remaining = cycleMs - (elapsed % cycleMs);
   immersiveBallSpinStopTimer = setTimeout(() => {
-    immersiveBall.classList.remove('is-translating');
+    immersiveBall.classList.remove('orange-translator-extension-9443e25e-state-translating');
     immersiveBallSpinStartedAt = 0;
     immersiveBallSpinStopTimer = null;
   }, remaining < 24 ? cycleMs : remaining);
 }
 
 function setImmersiveActiveIndicator(active) {
-  immersiveBall.classList.toggle('is-active', active);
+  immersiveBall.classList.toggle('orange-translator-extension-9443e25e-state-active', active);
   immersiveBall.setAttribute('aria-pressed', String(active));
   if (IS_TOP_FRAME) chrome.runtime.sendMessage({ type:'immersive-state-changed', active }).catch(() => {});
 }
@@ -144,7 +141,7 @@ function setImmersiveActiveIndicator(active) {
 immersiveBall.addEventListener('pointerdown', event => {
   const rect = immersiveBall.getBoundingClientRect();
   immersiveBallDrag = { id: event.pointerId, pointerType: event.pointerType, offsetX: event.clientX - rect.left, offsetY: event.clientY - rect.top, startX: event.clientX, startY: event.clientY, moved: false };
-  immersiveBall.classList.add('is-pressed');
+  immersiveBall.classList.add('orange-translator-extension-9443e25e-state-pressed');
   immersiveBall.setPointerCapture?.(event.pointerId);
   event.preventDefault();
 });
@@ -153,7 +150,7 @@ immersiveBall.addEventListener('pointermove', event => {
   const dragThreshold = immersiveBallDrag.pointerType === 'touch' ? 14 : 5;
   if (Math.hypot(event.clientX - immersiveBallDrag.startX, event.clientY - immersiveBallDrag.startY) > dragThreshold) immersiveBallDrag.moved = true;
   if (!immersiveBallDrag.moved) return;
-  if (immersiveBallDrag.moved) immersiveBall.classList.add('is-dragging');
+  if (immersiveBallDrag.moved) immersiveBall.classList.add('orange-translator-extension-9443e25e-state-dragging');
   const next = clampImmersiveBall(event.clientX - immersiveBallDrag.offsetX, event.clientY - immersiveBallDrag.offsetY);
   immersiveBall.style.left = `${next.left}px`;
   immersiveBall.style.top = `${next.top}px`;
@@ -162,11 +159,11 @@ immersiveBall.addEventListener('pointerup', event => {
   if (!immersiveBallDrag || event.pointerId !== immersiveBallDrag.id) return;
   const moved = immersiveBallDrag.moved;
   immersiveBallDrag = null;
-  immersiveBall.classList.remove('is-pressed', 'is-dragging');
+  immersiveBall.classList.remove('orange-translator-extension-9443e25e-state-pressed', 'orange-translator-extension-9443e25e-state-dragging');
   if (moved) chrome.storage.local.set({ immersiveBallPosition: { left: parseFloat(immersiveBall.style.left), top: parseFloat(immersiveBall.style.top) } });
   else toggleImmersive();
 });
-immersiveBall.addEventListener('pointercancel', () => { immersiveBallDrag = null; immersiveBall.classList.remove('is-pressed', 'is-dragging'); });
+immersiveBall.addEventListener('pointercancel', () => { immersiveBallDrag = null; immersiveBall.classList.remove('orange-translator-extension-9443e25e-state-pressed', 'orange-translator-extension-9443e25e-state-dragging'); });
 
 const esc = value => String(value).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
 
@@ -214,7 +211,7 @@ function placeSelectionPanel() {
     const top = Math.min(window.innerHeight - 80, Math.max(8, selectionPosition.top));
     root.style.left = `${Math.min(window.innerWidth - width - 8, Math.max(8, selectionPosition.left))}px`;
     root.style.top = `${top}px`;
-    root.style.setProperty('--lt-panel-top', `${top}px`);
+    root.style.setProperty('--orange-translator-extension-9443e25e-panel-top', `${top}px`);
     root.style.right = 'auto';
     return;
   }
@@ -223,32 +220,27 @@ function placeSelectionPanel() {
   root.style.left = `${Math.min(window.innerWidth - width - 8, Math.max(8, left))}px`;
   const top = Math.min(window.innerHeight - 260, Math.max(8, rect.bottom + 7));
   root.style.top = `${top}px`;
-  root.style.setProperty('--lt-panel-top', `${top}px`);
+  root.style.setProperty('--orange-translator-extension-9443e25e-panel-top', `${top}px`);
   root.style.right = 'auto';
 }
 
 function showSelection(html) {
   const firstOpen = panelMode !== 'selection' || root.hidden;
-  const entering = root.classList.contains('lt-panel-enter');
+  const entering = root.classList.contains('orange-translator-extension-9443e25e-panel-enter');
   if (!selectionAnchor) {
     const rect = trigger.getBoundingClientRect();
     selectionAnchor = { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom };
   }
   panelMode = 'selection';
-  root.className = `lt-selection-root${entering ? ' lt-panel-enter' : ''}`;
-  root.innerHTML = `<div class="lt-card">${html}</div>`;
+  root.className = `orange-translator-extension-9443e25e-selection-root${entering ? ' orange-translator-extension-9443e25e-panel-enter' : ''}`;
+  root.innerHTML = `<div class="orange-translator-extension-9443e25e-card">${html}</div>`;
   placeSelectionPanel();
   hideTrigger();
   root.hidden = false;
   if (firstOpen) {
-    clearTimeout(panelAnimationTimer);
-    root.classList.remove('lt-panel-enter');
+    root.classList.remove('orange-translator-extension-9443e25e-panel-exit');
     void root.offsetWidth;
-    root.classList.add('lt-panel-enter');
-    panelAnimationTimer = setTimeout(() => {
-      root.classList.remove('lt-panel-enter');
-      panelAnimationTimer = null;
-    }, 220);
+    root.classList.add('orange-translator-extension-9443e25e-panel-enter');
   }
   requestAnimationFrame(() => {
     const original = root.querySelector('[data-original]');
@@ -258,14 +250,14 @@ function showSelection(html) {
 }
 
 function originalBlock(text) {
-  return `<div class="lt-original-wrap"><div class="lt-original-label">${t('original')}</div><div class="lt-original" data-original>${esc(text)}</div><button class="lt-original-toggle" data-toggle-original hidden>${t('expandOriginal')}</button></div>`;
+  return `<div class="orange-translator-extension-9443e25e-original-wrap"><div class="orange-translator-extension-9443e25e-original-label">${t('original')}</div><div class="orange-translator-extension-9443e25e-original" data-original>${esc(text)}</div><button class="orange-translator-extension-9443e25e-original-toggle" data-toggle-original hidden>${t('expandOriginal')}</button></div>`;
 }
 
 function selectionCard(title, text, body) {
-  return `<div class="lt-head" data-drag-handle><b>${title}</b><button data-close aria-label="${t('close')}">×</button></div><div class="lt-card-body">${originalBlock(text)}${body}</div>`;
+  return `<div class="orange-translator-extension-9443e25e-head" data-drag-handle><b>${title}</b><button data-close aria-label="${t('close')}">×</button></div><div class="orange-translator-extension-9443e25e-card-body">${originalBlock(text)}${body}</div>`;
 }
 
-function closeSelection() {
+function closeSelection({ animate = true } = {}) {
   triggerVersion += 1;
   clearTimeout(triggerTimer);
   triggerTimer = null;
@@ -273,45 +265,59 @@ function closeSelection() {
   selectionRequest?.abort();
   selectionRequest = null;
   selectionAnchor = null;
-  clearTimeout(panelAnimationTimer);
-  panelAnimationTimer = null;
   if (panelMode === 'selection') {
-    root.replaceChildren();
-    root.hidden = true;
-    root.className = '';
-    panelMode = '';
+    const finish = () => {
+      if (panelMode !== 'selection') return;
+      root.replaceChildren();
+      root.hidden = true;
+      root.className = '';
+      panelMode = '';
+    };
+    if (animate && !root.hidden) {
+      root.classList.remove('orange-translator-extension-9443e25e-panel-enter');
+      root.classList.add('orange-translator-extension-9443e25e-panel-exit');
+      const onExitEnd = event => {
+        if (event.target !== root || event.animationName !== 'orange-translator-extension-9443e25e-panel-out') return;
+        root.removeEventListener('animationend', onExitEnd);
+        finish();
+      };
+      root.addEventListener('animationend', onExitEnd);
+    } else finish();
   }
   hideTrigger();
 }
 
 function showTrigger() {
-  clearTimeout(triggerAnimationTimer);
+  trigger.classList.remove('orange-translator-extension-9443e25e-trigger-enter', 'orange-translator-extension-9443e25e-trigger-exit');
   trigger.hidden = false;
-  trigger.classList.remove('lt-trigger-exit');
-  trigger.classList.add('lt-trigger-enter');
-  triggerAnimationTimer = setTimeout(() => {
-    trigger.classList.remove('lt-trigger-enter');
-    triggerAnimationTimer = null;
-  }, 180);
+  void trigger.offsetWidth;
+  trigger.classList.add('orange-translator-extension-9443e25e-trigger-enter');
 }
 
 function hideTrigger({ immediate = false } = {}) {
   clearTimeout(hoverTimer);
-  clearTimeout(triggerAnimationTimer);
-  trigger.classList.remove('lt-trigger-enter');
   if (trigger.hidden || immediate) {
-    trigger.classList.remove('lt-trigger-exit');
+    trigger.classList.remove('orange-translator-extension-9443e25e-trigger-enter', 'orange-translator-extension-9443e25e-trigger-exit');
     trigger.hidden = true;
-    triggerAnimationTimer = null;
     return;
   }
-  trigger.classList.add('lt-trigger-exit');
-  triggerAnimationTimer = setTimeout(() => {
+  trigger.classList.remove('orange-translator-extension-9443e25e-trigger-enter');
+  trigger.classList.add('orange-translator-extension-9443e25e-trigger-exit');
+  const onExitEnd = event => {
+    if (event.target !== trigger || event.animationName !== 'orange-translator-extension-9443e25e-trigger-out') return;
+    trigger.removeEventListener('animationend', onExitEnd);
     trigger.hidden = true;
-    trigger.classList.remove('lt-trigger-exit');
-    triggerAnimationTimer = null;
-  }, 150);
+    trigger.classList.remove('orange-translator-extension-9443e25e-trigger-exit');
+  };
+  trigger.addEventListener('animationend', onExitEnd);
 }
+
+trigger.addEventListener('animationend', event => {
+  if (event.target === trigger && event.animationName === 'orange-translator-extension-9443e25e-trigger-in') trigger.classList.remove('orange-translator-extension-9443e25e-trigger-enter');
+});
+root.addEventListener('animationend', event => {
+  if (event.target === root && event.animationName === 'orange-translator-extension-9443e25e-panel-in') root.classList.remove('orange-translator-extension-9443e25e-panel-enter');
+});
 
 function placeTrigger(pointer) {
   selectionPosition = null;
@@ -334,7 +340,7 @@ function selectionInsideExtensionUi() {
   if (!selection || selection.isCollapsed || selection.rangeCount === 0) return false;
   const container = selection.getRangeAt(0).commonAncestorContainer;
   const element = container.nodeType === Node.ELEMENT_NODE ? container : container.parentElement;
-  return Boolean(element?.closest?.('#lt-root,#lt-trigger,#lt-immersive-ball'));
+  return Boolean(element?.closest?.('#orange-translator-extension-9443e25e-root,#orange-translator-extension-9443e25e-trigger,#orange-translator-extension-9443e25e-immersive-ball'));
 }
 
 function selectedPageText() {
@@ -410,16 +416,16 @@ async function selectionTranslate(text = selectedText, renderInThisFrame = false
   const version = ++selectionVersion;
   selectionRequest?.abort();
   selectionRequest = new AbortController();
-  showSelection(selectionCard(t('translate'), text, '<div class="lt-loading"></div>'));
+  showSelection(selectionCard(t('translate'), text, '<div class="orange-translator-extension-9443e25e-loading"></div>'));
   try {
     const cfg = await settings();
     const translation = (await translateItems([{ id: 'q', text }], cfg, selectionRequest.signal))[0]?.translation || '';
     if (version !== selectionVersion) return;
-    const body = `<div class="lt-selection-result">${esc(translation || t('noResult'))}</div>`;
+    const body = `<div class="orange-translator-extension-9443e25e-selection-result">${esc(translation || t('noResult'))}</div>`;
     showSelection(selectionCard(t('translate'), text, body));
   } catch (error) {
     if (version !== selectionVersion || error.name === 'AbortError') return;
-    showSelection(selectionCard(t('translationFailed'), text, `<div class="lt-muted">${esc(error.message)}</div><div class="lt-muted">${t('switchServiceHint')}</div>`));
+    showSelection(selectionCard(t('translationFailed'), text, `<div class="orange-translator-extension-9443e25e-muted">${esc(error.message)}</div><div class="orange-translator-extension-9443e25e-muted">${t('switchServiceHint')}</div>`));
   }
 }
 
@@ -527,7 +533,7 @@ function immersiveRuleBlocks(cfg, rule) {
   const candidateSet = new Set(candidates);
   const nodes = candidates.filter(element => {
     if (!visible(element) || element.dataset.ltTranslated === '1' || element.dataset.ltLoading === '1') return false;
-    if (element.closest('#lt-root,#lt-trigger,[aria-hidden="true"]')) return false;
+    if (element.closest('#orange-translator-extension-9443e25e-root,#orange-translator-extension-9443e25e-trigger,[aria-hidden="true"]')) return false;
     if (stayOriginalTags.has(element.tagName) || excludeTags.has(element.tagName)) return false;
     if (excludeSelector && element.closest(excludeSelector)) return false;
     if (excludeRegexes.some(regex => regex.test(element.className || '') || regex.test(element.id || ''))) return false;
@@ -566,7 +572,7 @@ function blocks(cfg) {
   const nodes = candidates.filter(element => {
     if (!visible(element) || element.dataset.ltTranslated === '1' || element.dataset.ltLoading === '1') return false;
     if (isPromotedContent(element)) return false;
-    const genericExcludes = ['#lt-root', '#lt-trigger', 'footer', 'form', 'dialog', 'pre', 'code', 'textarea', 'input', 'select', 'button', '[aria-hidden="true"]', '.highlight', '.blob-code'];
+    const genericExcludes = ['#orange-translator-extension-9443e25e-root', '#orange-translator-extension-9443e25e-trigger', 'footer', 'form', 'dialog', 'pre', 'code', 'textarea', 'input', 'select', 'button', '[aria-hidden="true"]', '.highlight', '.blob-code'];
     if (!siteRule?.allowNav) genericExcludes.push('nav');
     if (!siteRule?.allowHeader) genericExcludes.push('header');
     if (!siteRule?.allowAside) genericExcludes.push('aside');
@@ -590,9 +596,9 @@ function applyTranslationTheme(node, theme = 'opacity') {
 
 function addTranslation(source, translation, targetLanguage, theme) {
   const separator = source.innerText.trim().length >= 20 ? document.createElement('br') : document.createTextNode(' ');
-  if (separator.nodeType === Node.ELEMENT_NODE) separator.className = 'lt-translation-break';
+  if (separator.nodeType === Node.ELEMENT_NODE) separator.className = 'orange-translator-extension-9443e25e-translation-break';
   const node = document.createElement('font');
-  node.className = 'lt-translated lt-immersive-translation';
+  node.className = 'orange-translator-extension-9443e25e-translated orange-translator-extension-9443e25e-immersive-translation';
   node.lang = /中文|zh/i.test(targetLanguage) ? 'zh-CN' : '';
   node.textContent = translation;
   applyTranslationTheme(node, theme);
@@ -603,9 +609,9 @@ function addTranslation(source, translation, targetLanguage, theme) {
 
 function addLoadingPlaceholder(source) {
   const separator = source.innerText.trim().length >= 20 ? document.createElement('br') : document.createTextNode(' ');
-  if (separator.nodeType === Node.ELEMENT_NODE) separator.className = 'lt-translation-break lt-loading-separator';
+  if (separator.nodeType === Node.ELEMENT_NODE) separator.className = 'orange-translator-extension-9443e25e-translation-break orange-translator-extension-9443e25e-loading-separator';
   const node = document.createElement('span');
-  node.className = 'lt-immersive-loading';
+  node.className = 'orange-translator-extension-9443e25e-immersive-loading';
   node.setAttribute('aria-label', t('translating'));
   node.innerHTML = '<i></i><i></i><i></i>';
   source.dataset.ltLoading = '1';
@@ -623,7 +629,7 @@ function removeLoadingPlaceholder(loading) {
 function replaceLoadingWithTranslation(loading, translation, targetLanguage, theme) {
   if (!loading?.source.isConnected || !loading.node.isConnected) return null;
   const node = document.createElement('font');
-  node.className = 'lt-translated lt-immersive-translation';
+  node.className = 'orange-translator-extension-9443e25e-translated orange-translator-extension-9443e25e-immersive-translation';
   node.lang = /中文|zh/i.test(targetLanguage) ? 'zh-CN' : '';
   node.textContent = translation;
   applyTranslationTheme(node, theme);
@@ -653,12 +659,6 @@ function restoreImmersive() {
     delete source.dataset.ltTranslated;
   });
   immersiveState = null;
-  if (panelMode === 'immersive') {
-    root.replaceChildren();
-    root.hidden = true;
-    root.className = '';
-    panelMode = '';
-  }
 }
 
 function isYouTubePage() {
@@ -672,10 +672,10 @@ function youtubeCaptionText(player) {
 }
 
 function ensureYouTubeSubtitleOverlay(player) {
-  let overlay = player.querySelector(':scope > #lt-youtube-subtitle');
+  let overlay = player.querySelector(':scope > #orange-translator-extension-9443e25e-youtube-subtitle');
   if (overlay) return overlay;
   overlay = document.createElement('div');
-  overlay.id = 'lt-youtube-subtitle';
+  overlay.id = 'orange-translator-extension-9443e25e-youtube-subtitle';
   overlay.lang = 'zh-CN';
   player.append(overlay);
   return overlay;
@@ -749,14 +749,6 @@ function stopYouTubeSubtitles() {
   clearTimeout(state.timer);
   state.overlay?.remove();
   youtubeSubtitleState = null;
-}
-
-function updateImmersiveStatus(state, label = t('continueOnScroll')) {
-  if (immersiveState !== state || panelMode !== 'immersive') return;
-  const progress = root.querySelector('[data-progress]');
-  const title = root.querySelector('[data-immersive-title]');
-  if (progress) progress.textContent = `${state.done.size} / ${state.items.length}`;
-  if (title) title.textContent = state.done.size >= state.items.length ? t('translationComplete') : label;
 }
 
 function observeRemaining(state) {
@@ -857,7 +849,6 @@ function registerDynamicBlocks(state) {
     added += 1;
   }
   if (added) {
-    updateImmersiveStatus(state, t('newContentFound'));
     scheduleVisibleBatch(state);
   }
 }
@@ -867,7 +858,7 @@ function isExtensionMutation(record) {
   return nodes.length > 0 && nodes.every(node => {
     if (node.nodeType === Node.TEXT_NODE) return !node.textContent.trim();
     if (node.nodeType !== Node.ELEMENT_NODE) return true;
-    return node.matches('#lt-root,#lt-trigger,.lt-immersive-translation,.lt-immersive-loading,.lt-translation-break') || Boolean(node.closest?.('#lt-root'));
+    return node.matches('#orange-translator-extension-9443e25e-root,#orange-translator-extension-9443e25e-trigger,.orange-translator-extension-9443e25e-immersive-translation,.orange-translator-extension-9443e25e-immersive-loading,.orange-translator-extension-9443e25e-translation-break') || Boolean(node.closest?.('#orange-translator-extension-9443e25e-root'));
   });
 }
 
@@ -905,7 +896,6 @@ async function flushVisibleBatch(state) {
   }
   state.inFlight += 1;
   updateImmersiveBallActivity(true);
-  updateImmersiveStatus(state, t('translating'));
   try {
     const translated = await translateItems(batch.map(({ id, text }) => ({ id, text })), state.cfg, state.controller.signal);
     const map = new Map(validateTranslations(batch, { translations: translated }).map(item => [item.id, item.translation]));
@@ -940,49 +930,21 @@ async function flushVisibleBatch(state) {
       state.active = false;
       updateImmersiveBallActivity(false);
       setImmersiveActiveIndicator(false);
-      state.observer.disconnect();
-      if (panelMode === 'immersive') {
-        root.replaceChildren();
-        root.hidden = true;
-        root.className = '';
-        panelMode = '';
-      }
+      state.observer?.disconnect();
+      state.dynamicObserver?.disconnect();
+      clearTimeout(state.flushTimer);
+      clearTimeout(state.scrollTimer);
+      clearTimeout(state.dynamicTimer);
+      window.removeEventListener('scroll', state.scrollHandler);
+      if (immersiveState === state) immersiveState = null;
     }
   } finally {
     state.inFlight -= 1;
     updateImmersiveBallActivity(state.active && state.inFlight > 0);
     if (state.active) {
-      updateImmersiveStatus(state);
       scheduleVisibleBatch(state);
     }
   }
-}
-
-function pauseImmersive() {
-  const state = immersiveState;
-  if (!state) return;
-  state.active = false;
-  updateImmersiveBallActivity(false);
-  state.observer?.disconnect();
-  clearTimeout(state.flushTimer);
-  clearTimeout(state.scrollTimer);
-  window.removeEventListener('scroll', state.scrollHandler);
-  state.flushTimer = null;
-  state.controller.abort();
-  state.loading.forEach(removeLoadingPlaceholder);
-  state.loading.clear();
-}
-
-function resumeImmersive() {
-  const state = immersiveState;
-  if (!state || state.active) return;
-  state.active = true;
-  state.controller = new AbortController();
-  state.pending.length = 0;
-  state.queuedIds = new Set(state.done);
-  state.scrollIdle = true;
-  window.addEventListener('scroll', state.scrollHandler, { passive: true });
-  observeRemaining(state);
 }
 
 async function immersive() {
@@ -1045,9 +1007,9 @@ function toggleImmersive() {
 }
 
 function onSelectionMouseup(event) {
-  if (event.target.closest?.('#lt-root,#lt-trigger')) return;
+  if (event.target.closest?.('#orange-translator-extension-9443e25e-root,#orange-translator-extension-9443e25e-trigger')) return;
   const selectionPanelVisible = panelMode === 'selection' && !root.hidden;
-  if (selectionPanelVisible) closeSelection();
+  if (selectionPanelVisible) closeSelection({ animate: false });
   const selection = document.getSelection();
   const text = selectionInsideExtensionUi() ? '' : liveSelectionText();
   let anchor = lastSelectionAnchor;
@@ -1074,7 +1036,6 @@ function onSelectionChange() {
 }
 
 function setSelectionTriggerEnabled(enabled) {
-  selectionTriggerEnabled = enabled;
   document.removeEventListener('mouseup', onSelectionMouseup, true);
   document.removeEventListener('selectionchange', onSelectionChange);
   if (enabled) {
@@ -1128,7 +1089,7 @@ function translateCurrentSelection(source = 'shortcut', suppliedText = '') {
 }
 
 document.addEventListener('pointerdown', event => {
-  if (panelMode === 'selection' && !root.hidden && !event.target.closest?.('#lt-root')) closeSelection();
+  if (panelMode === 'selection' && !root.hidden && !event.target.closest?.('#orange-translator-extension-9443e25e-root')) closeSelection();
 }, true);
 
 const openFromHover = () => {
@@ -1156,7 +1117,7 @@ root.addEventListener('pointerdown', event => {
   const rect = root.getBoundingClientRect();
   panelDrag = { pointerId: event.pointerId, offsetX: event.clientX - rect.left, offsetY: event.clientY - rect.top };
   handle.setPointerCapture?.(event.pointerId);
-  root.classList.add('is-dragging');
+  root.classList.add('orange-translator-extension-9443e25e-state-dragging');
   event.preventDefault();
 });
 
@@ -1168,14 +1129,14 @@ root.addEventListener('pointermove', event => {
   selectionPosition = { left, top };
   root.style.left = `${left}px`;
   root.style.top = `${top}px`;
-  root.style.setProperty('--lt-panel-top', `${top}px`);
+  root.style.setProperty('--orange-translator-extension-9443e25e-panel-top', `${top}px`);
   root.style.right = 'auto';
 });
 
 const stopPanelDrag = event => {
   if (!panelDrag || event.pointerId !== panelDrag.pointerId) return;
   panelDrag = null;
-  root.classList.remove('is-dragging');
+  root.classList.remove('orange-translator-extension-9443e25e-state-dragging');
 };
 root.addEventListener('pointerup', stopPanelDrag);
 root.addEventListener('pointercancel', stopPanelDrag);
@@ -1188,26 +1149,18 @@ window.addEventListener('resize', () => {
   selectionPosition.top = Math.min(window.innerHeight - 54, Math.max(8, selectionPosition.top));
   root.style.left = `${selectionPosition.left}px`;
   root.style.top = `${selectionPosition.top}px`;
-  root.style.setProperty('--lt-panel-top', `${selectionPosition.top}px`);
+  root.style.setProperty('--orange-translator-extension-9443e25e-panel-top', `${selectionPosition.top}px`);
 });
 
 document.addEventListener('click', event => {
   if (event.target.matches('[data-toggle-original]')) {
     const original = root.querySelector('[data-original]');
     if (original) {
-      const expanded = original.classList.toggle('is-expanded');
+      const expanded = original.classList.toggle('orange-translator-extension-9443e25e-state-expanded');
       event.target.textContent = expanded ? t('collapseOriginal') : t('expandOriginal');
     }
   }
   if (event.target.matches('[data-close]')) closeSelection();
-  if (event.target.matches('[data-stop]') && immersiveState) chrome.runtime.sendMessage({ type: 'broadcast-immersive', action: 'pause' });
-  if (event.target.matches('[data-restore]')) chrome.runtime.sendMessage({ type: 'broadcast-immersive', action: 'restore' });
-  if (event.target.matches('[data-resume]')) chrome.runtime.sendMessage({ type: 'broadcast-immersive', action: 'resume' });
-  if (event.target.matches('[data-settings]')) chrome.runtime.sendMessage({ type: 'open-options-page' });
-  if (event.target.matches('[data-dismiss]') && panelMode === 'immersive') {
-    root.hidden = true;
-    panelMode = '';
-  }
 });
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
@@ -1219,8 +1172,6 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   else if (message.type === 'toggle-immersive') toggleImmersive();
   else if (message.type === 'immersive-translate' || message.type === 'immersive-start') immersive();
   else if (message.type === 'immersive-restore') restoreImmersive();
-  else if (message.type === 'immersive-pause') pauseImmersive();
-  else if (message.type === 'immersive-resume') resumeImmersive();
 });
 
 chrome.storage.onChanged.addListener((changes, area) => {
@@ -1231,12 +1182,10 @@ chrome.storage.onChanged.addListener((changes, area) => {
   if (!changes.uiLanguage) return;
   i18n.load(changes.uiLanguage.newValue || 'auto').then(() => {
     const replacements = [
-      ['[data-toggle-original]', root.querySelector('[data-original]')?.classList.contains('is-expanded') ? 'collapseOriginal' : 'expandOriginal'],
-      ['[data-stop]', 'pause'], ['[data-resume]', 'resume'], ['[data-restore]', immersiveState?.active === false ? 'exitTranslation' : 'exitTranslation'],
-      ['[data-settings]', 'settings']
+      ['[data-toggle-original]', root.querySelector('[data-original]')?.classList.contains('orange-translator-extension-9443e25e-state-expanded') ? 'collapseOriginal' : 'expandOriginal']
     ];
     replacements.forEach(([selector, key]) => { const node = root.querySelector(selector); if (node) node.textContent = t(key); });
-    const original = root.querySelector('.lt-original-label');
+    const original = root.querySelector('.orange-translator-extension-9443e25e-original-label');
     if (original) original.textContent = t('original');
   });
 });

@@ -64,18 +64,6 @@ async function selectedTextFromTab(tabId) {
   const responses = await Promise.all(frames.map(frame => bounded(chrome.tabs.sendMessage(tabId, { type: 'get-selected-text' }, { frameId: frame.frameId }))));
   return responses.find(text => typeof text === 'string' && text.trim())?.trim() || '';
 }
-async function selectedTextForPopup() {
-  const extensionOrigin = chrome.runtime.getURL('');
-  const tabs = await chrome.tabs.query({ currentWindow: true });
-  const candidates = tabs
-    .filter(tab => tab.id && tab.url && !tab.url.startsWith(extensionOrigin))
-    .sort((a, b) => Number(b.active) - Number(a.active) || Number(b.id === lastWebTabId) - Number(a.id === lastWebTabId) || (b.lastAccessed || 0) - (a.lastAccessed || 0));
-  for (const tab of candidates) {
-    const text = await selectedTextFromTab(tab.id);
-    if (text) return text;
-  }
-  return '';
-}
 async function popupContext() {
   const extensionOrigin = chrome.runtime.getURL('');
   const tabs = await chrome.tabs.query({ currentWindow: true });
@@ -132,8 +120,6 @@ chrome.runtime.onMessage.addListener((message, sender) => {
     return;
   }
   if (message?.type === 'get-popup-context') return popupContext();
-  if (message?.type === 'get-active-selection') return selectedTextForPopup();
-  if (message?.type === 'open-options-page') return chrome.runtime.openOptionsPage();
   if (message?.type === 'open-pdf-viewer') return openPdfViewer(message.url || '', message.useCurrentUrl === true);
   if (message?.type === 'http-cancel') {
     const record = networkRequests.get(message.requestId);

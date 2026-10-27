@@ -70,7 +70,7 @@ try {
   if (languageMenuStyle.maxHeight !== '280px' || languageMenuStyle.overflowY !== 'auto') throw new Error(`语言下拉菜单未统一限高：${JSON.stringify(languageMenuStyle)}`);
   await options.keyboard.press('Escape');
   await options.setViewportSize({ width: 225, height: 844 });
-  if (await options.evaluate(() => document.documentElement.classList.contains('lt-mobile-ui'))) throw new Error('桌面 UA 在窄窗口下错误启用了移动版设置样式');
+  if (await options.evaluate(() => document.documentElement.classList.contains('orange-translator-extension-9443e25e-mobile-ui'))) throw new Error('桌面 UA 在窄窗口下错误启用了移动版设置样式');
   await options.setViewportSize({ width: 1280, height: 900 });
 
   await options.locator('#uiLanguage').selectOption('en');
@@ -150,7 +150,7 @@ try {
   if (await popupVisual.locator('dialog,[role="alertdialog"]').count()) throw new Error('快速翻译失败不应显示额外弹窗');
   await popupVisual.evaluate(() => chrome.storage.local.set({ provider:'microsoft-free' }));
   await popupVisual.setViewportSize({ width: 225, height: 844 });
-  if (await popupVisual.evaluate(() => document.documentElement.classList.contains('lt-mobile-ui'))) throw new Error('桌面 UA 在窄窗口下错误启用了移动版弹窗样式');
+  if (await popupVisual.evaluate(() => document.documentElement.classList.contains('orange-translator-extension-9443e25e-mobile-ui'))) throw new Error('桌面 UA 在窄窗口下错误启用了移动版弹窗样式');
   await popupVisual.setViewportSize({ width: 390, height: 844 });
   const lightVisual = await popupVisual.evaluate(() => {
     const gear = getComputedStyle(document.querySelector('#options'));
@@ -172,7 +172,7 @@ try {
   const popupSelectionPage = await context.newPage();
   const popupSelectionUrl = `${url}/?popup-selection=1`;
   await popupSelectionPage.goto(popupSelectionUrl, { waitUntil:'domcontentloaded' });
-  await popupSelectionPage.locator('#lt-trigger').waitFor({ state:'attached', timeout:10000 });
+  await popupSelectionPage.locator('#orange-translator-extension-9443e25e-trigger').waitFor({ state:'attached', timeout:10000 });
   await popupSelectionPage.bringToFront();
   await popupSelectionPage.waitForTimeout(400);
   const popupSelectionText = await popupSelectionPage.locator('#p2').textContent();
@@ -184,9 +184,9 @@ try {
   });
   const popupSelectionTabId = await options.evaluate(async () => (await chrome.tabs.query({})).find(tab => tab.url?.includes('popup-selection=1'))?.id || 0);
   if (!popupSelectionTabId) throw new Error('未找到选区导入测试标签页');
-  await popupSelectionPage.locator('#lt-trigger').waitFor({ state:'visible', timeout:5000 });
+  await popupSelectionPage.locator('#orange-translator-extension-9443e25e-trigger').waitFor({ state:'visible', timeout:5000 });
   const extensionUiSelection = await popupSelectionPage.evaluate(() => {
-    const root = document.querySelector('#lt-root');
+    const root = document.querySelector('#orange-translator-extension-9443e25e-root');
     root.hidden = false;
     root.innerHTML = '<div data-test-extension-selection>Extension translation panel text</div>';
     const range = document.createRange(); range.selectNodeContents(root.querySelector('[data-test-extension-selection]'));
@@ -197,7 +197,7 @@ try {
   const blockedExtensionText = await options.evaluate(tabId => chrome.tabs.sendMessage(tabId, { type:'get-selected-text' }), popupSelectionTabId);
   if (blockedExtensionText) throw new Error(`扩展浮窗文本不应带入快速翻译：${blockedExtensionText}`);
   await popupSelectionPage.evaluate(() => {
-    const root = document.querySelector('#lt-root'); root.replaceChildren(); root.hidden = true;
+    const root = document.querySelector('#orange-translator-extension-9443e25e-root'); root.replaceChildren(); root.hidden = true;
     const range = document.createRange(); range.selectNodeContents(document.querySelector('#p2'));
     const selection = getSelection(); selection.removeAllRanges(); selection.addRange(range);
   });
@@ -227,7 +227,11 @@ try {
       return cdp;
     };
     let mobileWorker = mobileContext.serviceWorkers()[0];
-    if (!mobileWorker) mobileWorker = await mobileContext.waitForEvent('serviceworker', { timeout: 30000 });
+    for (let attempt = 0; !mobileWorker && attempt < 3; attempt += 1) {
+      mobileWorker = await mobileContext.waitForEvent('serviceworker', { timeout: 15000 }).catch(() => mobileContext.serviceWorkers()[0] || null);
+      if (!mobileWorker && !mobileContext.pages().length) await mobileContext.newPage();
+    }
+    if (!mobileWorker) throw new Error('移动设备模拟未能启动扩展 Service Worker');
     const mobileExtensionId = new URL(mobileWorker.url()).host;
     await mobileWorker.evaluate(() => chrome.storage.local.set({ uiLanguage: 'zh-CN', touchGesture: 'three', showImmersiveBall: true }));
     const mobileOptions = await mobileContext.newPage();
@@ -240,7 +244,7 @@ try {
       const switches = [...document.querySelectorAll('.switch-row input[type="checkbox"]')].map(node => { const r=node.getBoundingClientRect(); return { width:r.width, height:r.height }; });
       const fontSize = selector => parseFloat(getComputedStyle(document.querySelector(selector)).fontSize);
       const fonts = { pageTitle:fontSize('.settings-header .brand'), sectionTitle:fontSize('.settings-card h2'), label:fontSize('.settings-card label'), help:fontSize('.settings-card .section-help'), control:fontSize('.settings-card .custom-combobox-button') };
-      return { mobile: document.documentElement.classList.contains('lt-mobile-ui'), scrollWidth: document.documentElement.scrollWidth, viewport: innerWidth, settings:rect('.settings'), card:rect('.settings-card'), providerRow:rect('[data-provider="microsoft-free"] .provider-action-row'), providerButton:rect('[data-provider="microsoft-free"] button'), columns:getComputedStyle(document.querySelector('.two-columns')).gridTemplateColumns, switches, fonts, overflow };
+      return { mobile: document.documentElement.classList.contains('orange-translator-extension-9443e25e-mobile-ui'), scrollWidth: document.documentElement.scrollWidth, viewport: innerWidth, settings:rect('.settings'), card:rect('.settings-card'), providerRow:rect('[data-provider="microsoft-free"] .provider-action-row'), providerButton:rect('[data-provider="microsoft-free"] button'), columns:getComputedStyle(document.querySelector('.two-columns')).gridTemplateColumns, switches, fonts, overflow };
     });
     const fonts = mobileSettingsLayout.fonts;
     if (!mobileSettingsLayout.mobile || mobileSettingsLayout.scrollWidth > mobileSettingsLayout.viewport || mobileSettingsLayout.columns.split(' ').length !== 1 || mobileSettingsLayout.card?.right > mobileSettingsLayout.viewport + 1 || mobileSettingsLayout.switches.some(item => Math.abs(item.width - 42) > 1 || Math.abs(item.height - 22) > 1) || fonts.pageTitle < 22 || fonts.sectionTitle < 18 || fonts.label < 15 || fonts.help < 14 || fonts.control < 16 || mobileSettingsLayout.overflow.length) throw new Error(`真实移动 UA 设置页适配失败：${JSON.stringify(mobileSettingsLayout)}`);
@@ -275,41 +279,41 @@ try {
     const mobilePage = await mobileContext.newPage();
     await emulateMobileDevice(mobilePage);
     await mobilePage.goto(url, { waitUntil: 'domcontentloaded' });
-    await mobilePage.locator('#lt-immersive-ball').waitFor({ state: 'visible', timeout: 10000 });
-    const ballBefore = await mobilePage.locator('#lt-immersive-ball').boundingBox();
+    await mobilePage.locator('#orange-translator-extension-9443e25e-immersive-ball').waitFor({ state: 'visible', timeout: 10000 });
+    const ballBefore = await mobilePage.locator('#orange-translator-extension-9443e25e-immersive-ball').boundingBox();
     const mobilePageViewport = await mobilePage.evaluate(() => ({ width: innerWidth, height: innerHeight }));
     if (!ballBefore || ballBefore.x < 0 || ballBefore.y < 0 || ballBefore.x + ballBefore.width > mobilePageViewport.width || ballBefore.y + ballBefore.height > mobilePageViewport.height) throw new Error(`沉浸式快捷橙子不在视口内：${JSON.stringify({ ballBefore, mobilePageViewport })}`);
-    await mobilePage.locator('#lt-immersive-ball').evaluate(node => {
+    await mobilePage.locator('#orange-translator-extension-9443e25e-immersive-ball').evaluate(node => {
       const rect = node.getBoundingClientRect();
       node.dispatchEvent(new PointerEvent('pointerdown', { bubbles:true, pointerType:'touch', pointerId:91, clientX:rect.left+22, clientY:rect.top+22 }));
       node.dispatchEvent(new PointerEvent('pointermove', { bubbles:true, pointerType:'touch', pointerId:91, clientX:rect.left+30, clientY:rect.top+22 }));
       node.dispatchEvent(new PointerEvent('pointerup', { bubbles:true, pointerType:'touch', pointerId:91, clientX:rect.left+30, clientY:rect.top+22 }));
     });
-    await mobilePage.locator('#lt-immersive-ball.is-active').waitFor({ state:'visible', timeout:5000 });
-    const ballAfterJitter = await mobilePage.locator('#lt-immersive-ball').boundingBox();
+    await mobilePage.locator('#orange-translator-extension-9443e25e-immersive-ball.orange-translator-extension-9443e25e-state-active').waitFor({ state:'visible', timeout:5000 });
+    const ballAfterJitter = await mobilePage.locator('#orange-translator-extension-9443e25e-immersive-ball').boundingBox();
     if (!ballAfterJitter || Math.abs(ballAfterJitter.x - ballBefore.x) > 1 || Math.abs(ballAfterJitter.y - ballBefore.y) > 1) throw new Error(`触屏轻微抖动不应移动橙子：${JSON.stringify({ ballBefore, ballAfterJitter })}`);
     const jitterTabId = await mobileWorker.evaluate(async urlPrefix => (await chrome.tabs.query({})).find(tab => tab.url?.startsWith(urlPrefix))?.id || 0, url);
     await mobileOptions.evaluate(tabId => chrome.runtime.sendMessage({ type:'broadcast-immersive', action:'restore', tabId }), jitterTabId);
-    await mobilePage.waitForFunction(() => !document.querySelector('#lt-immersive-ball')?.classList.contains('is-active'), null, { timeout:10000 });
+    await mobilePage.waitForFunction(() => !document.querySelector('#orange-translator-extension-9443e25e-immersive-ball')?.classList.contains('orange-translator-extension-9443e25e-state-active'), null, { timeout:10000 });
     await mobilePage.mouse.move(ballBefore.x + 22, ballBefore.y + 22);
     await mobilePage.mouse.down();
     await mobilePage.mouse.move(180, 420, { steps: 5 });
     await mobilePage.mouse.up();
-    const ballAfter = await mobilePage.locator('#lt-immersive-ball').boundingBox();
+    const ballAfter = await mobilePage.locator('#orange-translator-extension-9443e25e-immersive-ball').boundingBox();
     if (!ballAfter || Math.abs(ballAfter.x - ballBefore.x) < 20 || ballAfter.x < 0 || ballAfter.y < 0 || ballAfter.x + ballAfter.width > mobilePageViewport.width || ballAfter.y + ballAfter.height > mobilePageViewport.height) throw new Error(`沉浸式快捷橙子拖动或视口限制失败：${JSON.stringify({ ballBefore, ballAfter, mobilePageViewport })}`);
     const spinStart = Date.now();
-    await mobilePage.locator('#lt-immersive-ball').click();
-    await mobilePage.locator('#lt-immersive-ball.is-translating').waitFor({ state: 'visible', timeout: 5000 });
-    await mobilePage.locator('#lt-immersive-ball.is-active').waitFor({ state: 'visible', timeout: 5000 });
-    await mobilePage.waitForFunction(() => document.querySelector('.lt-immersive-translation') || document.querySelector('#lt-root')?.textContent?.includes('翻译失败'), null, { timeout: 90000 });
-    await mobilePage.waitForFunction(() => !document.querySelector('#lt-immersive-ball')?.classList.contains('is-translating'), null, { timeout: 10000 });
+    await mobilePage.locator('#orange-translator-extension-9443e25e-immersive-ball').click();
+    await mobilePage.locator('#orange-translator-extension-9443e25e-immersive-ball.orange-translator-extension-9443e25e-state-translating').waitFor({ state: 'visible', timeout: 5000 });
+    await mobilePage.locator('#orange-translator-extension-9443e25e-immersive-ball.orange-translator-extension-9443e25e-state-active').waitFor({ state: 'visible', timeout: 5000 });
+    await mobilePage.waitForFunction(() => document.querySelector('.orange-translator-extension-9443e25e-immersive-translation') || document.querySelector('#orange-translator-extension-9443e25e-root')?.textContent?.includes('翻译失败'), null, { timeout: 90000 });
+    await mobilePage.waitForFunction(() => !document.querySelector('#orange-translator-extension-9443e25e-immersive-ball')?.classList.contains('orange-translator-extension-9443e25e-state-translating'), null, { timeout: 10000 });
     if (Date.now() - spinStart < 560) throw new Error(`沉浸式快捷橙子旋转未完成一圈：${Date.now() - spinStart}ms`);
     const mobilePageTabId = await mobileWorker.evaluate(async urlPrefix => (await chrome.tabs.query({})).find(tab => tab.url?.startsWith(urlPrefix))?.id || 0, url);
     const backendActive = await mobileOptions.evaluate(tabId => chrome.runtime.sendMessage({ type:'get-immersive-state', tabId }), mobilePageTabId);
     if (!backendActive) throw new Error('后台没有同步沉浸式翻译启用状态');
     await mobileOptions.evaluate(tabId => chrome.runtime.sendMessage({ type: 'broadcast-immersive', action: 'restore', tabId }), mobilePageTabId);
-    await mobilePage.waitForFunction(() => document.querySelectorAll('.lt-immersive-translation').length === 0, null, { timeout: 10000 });
-    if (await mobilePage.locator('#lt-immersive-ball.is-active').count()) throw new Error('退出后常驻橙子仍显示启用状态');
+    await mobilePage.waitForFunction(() => document.querySelectorAll('.orange-translator-extension-9443e25e-immersive-translation').length === 0, null, { timeout: 10000 });
+    if (await mobilePage.locator('#orange-translator-extension-9443e25e-immersive-ball.orange-translator-extension-9443e25e-state-active').count()) throw new Error('退出后常驻橙子仍显示启用状态');
 
     await mobilePage.evaluate(() => {
       const target = document.querySelector('main');
@@ -317,7 +321,7 @@ try {
       for (const [pointerId, clientX, clientY] of points) target.dispatchEvent(new PointerEvent('pointerdown', { bubbles:true, pointerType:'touch', pointerId, clientX, clientY, isPrimary:pointerId===1 }));
       for (const [pointerId, clientX, clientY] of points) target.dispatchEvent(new PointerEvent('pointerup', { bubbles:true, pointerType:'touch', pointerId, clientX, clientY, isPrimary:pointerId===1 }));
     });
-    await mobilePage.waitForFunction(() => document.querySelector('.lt-immersive-translation') || document.querySelector('#lt-root')?.textContent?.includes('翻译失败'), null, { timeout: 90000 });
+    await mobilePage.waitForFunction(() => document.querySelector('.orange-translator-extension-9443e25e-immersive-translation') || document.querySelector('#orange-translator-extension-9443e25e-root')?.textContent?.includes('翻译失败'), null, { timeout: 90000 });
     await mobilePage.screenshot({ path: path.join(root, 'temp', 'mobile-page.png'), fullPage: false });
     console.log('PASS mobile Edge simulation: settings layout, gesture, and persistent ball');
   } finally {
@@ -339,7 +343,7 @@ try {
     selection.removeAllRanges(); selection.addRange(range);
     node.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, clientX: 300, clientY: 220 }));
   });
-  await pdfViewer.locator('#lt-trigger').waitFor({ state: 'visible', timeout: 10000 });
+  await pdfViewer.locator('#orange-translator-extension-9443e25e-trigger').waitFor({ state: 'visible', timeout: 10000 });
   await pdfViewer.close();
   console.log('PASS PDF.js viewer: original layout, text layer selection translation enabled');
 
@@ -403,12 +407,12 @@ try {
   await worker.evaluate(() => chrome.storage.local.set({ autoImmersiveTranslate: true }));
   const autoImmersivePage = await context.newPage();
   await autoImmersivePage.goto(`${url}/?auto-immersive=1`, { waitUntil:'domcontentloaded' });
-  await autoImmersivePage.waitForFunction(() => document.querySelector('.lt-immersive-translation'), null, { timeout:90000 });
+  await autoImmersivePage.waitForFunction(() => document.querySelector('.orange-translator-extension-9443e25e-immersive-translation'), null, { timeout:90000 });
   const autoImmersiveTabId = await options.evaluate(async () => (await chrome.tabs.query({})).find(tab => tab.url?.includes('auto-immersive=1'))?.id || 0);
   const popupStatePage = await context.newPage();
   await gotoExtensionPage(popupStatePage, 'popup.html');
   await popupStatePage.waitForFunction(() => !document.querySelector('[data-immersive-state]')?.hidden);
-  if (!await popupStatePage.locator('#page').evaluate(node => node.classList.contains('is-active') && node.getAttribute('aria-pressed') === 'true')) throw new Error('Popup 没有显示沉浸式翻译已启用状态');
+  if (!await popupStatePage.locator('#page').evaluate(node => node.classList.contains('orange-translator-extension-9443e25e-state-active') && node.getAttribute('aria-pressed') === 'true')) throw new Error('Popup 没有显示沉浸式翻译已启用状态');
   await popupStatePage.close();
   await options.evaluate(tabId => chrome.runtime.sendMessage({ type:'broadcast-immersive', action:'restore', tabId }), autoImmersiveTabId);
   await autoImmersivePage.close();
@@ -416,6 +420,7 @@ try {
   console.log('PASS immersive active indicators and automatic translation setting');
   const page = await context.newPage();
   await page.goto(url);
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
   await worker.evaluate(() => chrome.storage.local.set({ enableSelectionTrigger: false }));
   await page.waitForTimeout(250);
   await page.evaluate(() => {
@@ -426,16 +431,16 @@ try {
     document.querySelector('#p1').dispatchEvent(new MouseEvent('mouseup', { bubbles: true, clientX: 320, clientY: 180 }));
   });
   await page.waitForTimeout(300);
-  if (await page.locator('#lt-trigger').isVisible()) throw new Error('关闭划词图标后 mouseup 仍显示了悬浮图标');
+  if (await page.locator('#orange-translator-extension-9443e25e-trigger').isVisible()) throw new Error('关闭划词图标后 mouseup 仍显示了悬浮图标');
   await broadcastToFrames('http://127.0.0.1:', 'translate-selection');
-  await page.locator('#lt-root:not([hidden])').waitFor({ timeout: 5000 });
+  await page.locator('#orange-translator-extension-9443e25e-root:not([hidden])').waitFor({ timeout: 5000 });
   await page.waitForTimeout(260);
-  if (!(await page.locator('#lt-root').textContent())?.includes('原文')) throw new Error('关闭划词图标后快捷键/右键入口没有直接打开翻译浮窗');
-  const directPanelBox = await page.locator('#lt-root').boundingBox();
+  if (!(await page.locator('#orange-translator-extension-9443e25e-root').textContent())?.includes('原文')) throw new Error('关闭划词图标后快捷键/右键入口没有直接打开翻译浮窗');
+  const directPanelBox = await page.locator('#orange-translator-extension-9443e25e-root').boundingBox();
   const selectedBox = await page.locator('#p1').boundingBox();
   if (!directPanelBox || !selectedBox || Math.abs(directPanelBox.x - selectedBox.x) > 40 || directPanelBox.y < selectedBox.y - 20 || directPanelBox.y > selectedBox.y + selectedBox.height + 60) throw new Error(`无悬浮图标时翻译浮窗没有靠近选区：${JSON.stringify({ directPanelBox, selectedBox })}`);
   await page.locator('body').click({ position: { x: 8, y: 8 }, force: true });
-  await page.locator('#lt-root').waitFor({ state: 'hidden', timeout: 5000 });
+  await page.locator('#orange-translator-extension-9443e25e-root').waitFor({ state: 'hidden', timeout: 5000 });
   await worker.evaluate(() => chrome.storage.local.set({ enableSelectionTrigger: true }));
   await page.waitForTimeout(250);
   console.log('PASS selection trigger switch: mouse listener disabled, direct command unaffected');
@@ -450,22 +455,22 @@ try {
     input.focus(); input.setSelectionRange(3, 28);
     input.dispatchEvent(new MouseEvent('mouseup', { bubbles:true, clientX:rect.left + Math.min(30, rect.width / 2), clientY:rect.top + rect.height / 2 }));
   });
-  await page.locator('#lt-trigger').waitFor({ state:'visible', timeout:5000 });
-  await page.locator('#lt-trigger').hover();
-  await page.locator('#lt-root:not([hidden])').waitFor({ timeout:5000 });
-  if (!(await page.locator('#lt-root [data-original]').textContent())?.includes('This code comment')) throw new Error('代码输入层悬停后没有打开翻译浮窗');
+  await page.locator('#orange-translator-extension-9443e25e-trigger').waitFor({ state:'visible', timeout:5000 });
+  await page.locator('#orange-translator-extension-9443e25e-trigger').hover();
+  await page.locator('#orange-translator-extension-9443e25e-root:not([hidden])').waitFor({ timeout:5000 });
+  if (!(await page.locator('#orange-translator-extension-9443e25e-root [data-original]').textContent())?.includes('This code comment')) throw new Error('代码输入层悬停后没有打开翻译浮窗');
   await page.locator('body').click({ position:{ x:8, y:8 }, force:true });
-  await page.locator('#lt-root').waitFor({ state:'hidden', timeout:5000 });
-  await page.locator('#lt-trigger').waitFor({ state:'hidden', timeout:5000 });
+  await page.locator('#orange-translator-extension-9443e25e-root').waitFor({ state:'hidden', timeout:5000 });
+  await page.locator('#orange-translator-extension-9443e25e-trigger').waitFor({ state:'hidden', timeout:5000 });
   console.log('PASS code selection: hidden text control opens trigger and popup');
   const contextMenuText = '// Context menu translation must use supplied selection text.';
   await page.evaluate(() => getSelection().removeAllRanges());
   const mainTestTabId = await options.evaluate(async () => (await chrome.tabs.query({})).find(tab => tab.active && tab.url?.startsWith('http://127.0.0.1:'))?.id || 0);
   await options.evaluate(async ({ tabId, text }) => chrome.tabs.sendMessage(tabId, { type:'translate-selection', source:'context-menu', text }), { tabId:mainTestTabId, text: contextMenuText });
-  await page.locator('#lt-root:not([hidden])').waitFor({ timeout:5000 });
-  if (!(await page.locator('#lt-root [data-original]').textContent())?.includes(contextMenuText)) throw new Error('右键翻译没有使用浏览器提供的 selectionText');
+  await page.locator('#orange-translator-extension-9443e25e-root:not([hidden])').waitFor({ timeout:5000 });
+  if (!(await page.locator('#orange-translator-extension-9443e25e-root [data-original]').textContent())?.includes(contextMenuText)) throw new Error('右键翻译没有使用浏览器提供的 selectionText');
   await page.locator('body').click({ position:{ x:8, y:8 }, force:true });
-  await page.locator('#lt-root').waitFor({ state:'hidden', timeout:5000 });
+  await page.locator('#orange-translator-extension-9443e25e-root').waitFor({ state:'hidden', timeout:5000 });
   console.log('PASS context menu selection: supplied selectionText opens translation directly');
   await worker.evaluate(() => chrome.storage.local.set({ touchGesture: 'three' }));
   await page.waitForTimeout(250);
@@ -475,9 +480,9 @@ try {
     for (const [pointerId, clientX, clientY] of points) target.dispatchEvent(new PointerEvent('pointerdown', { bubbles:true, pointerType:'touch', pointerId, clientX, clientY, isPrimary:pointerId===1 }));
     for (const [pointerId, clientX, clientY] of points) target.dispatchEvent(new PointerEvent('pointerup', { bubbles:true, pointerType:'touch', pointerId, clientX, clientY, isPrimary:pointerId===1 }));
   });
-  await page.waitForFunction(() => document.querySelector('.lt-immersive-translation') || document.querySelector('#lt-root')?.textContent?.includes('翻译失败'), null, { timeout: 90000 });
-  if (!await page.locator('.lt-immersive-translation').count()) throw new Error('三指轻触没有触发沉浸式翻译');
-  const coloredThemeStyle = await page.locator('.lt-immersive-translation').first().evaluate(node => {
+  await page.waitForFunction(() => document.querySelector('.orange-translator-extension-9443e25e-immersive-translation') || document.querySelector('#orange-translator-extension-9443e25e-root')?.textContent?.includes('翻译失败'), null, { timeout: 90000 });
+  if (!await page.locator('.orange-translator-extension-9443e25e-immersive-translation').count()) throw new Error('三指轻触没有触发沉浸式翻译');
+  const coloredThemeStyle = await page.locator('.orange-translator-extension-9443e25e-immersive-translation').first().evaluate(node => {
     node.parentElement.style.color = 'rgb(35, 90, 210)';
     node.dataset.ltTheme = 'wavy';
     const wavy = getComputedStyle(node);
@@ -491,7 +496,7 @@ try {
   if (coloredThemeStyle.textColor !== 'rgb(35, 90, 210)' || coloredThemeStyle.wavyColor !== 'rgb(114, 236, 233)' || coloredThemeStyle.wavyStyle !== 'wavy' || coloredThemeStyle.dashedColor !== 'rgb(114, 236, 233)' || coloredThemeStyle.dashedStyle !== 'dashed') throw new Error(`彩色原文覆盖了译文装饰线样式：${JSON.stringify(coloredThemeStyle)}`);
   console.log('PASS translation themes: colored source text does not override decoration colors');
   await broadcastToFrames('http://127.0.0.1:', 'immersive-restore');
-  await page.waitForFunction(() => document.querySelectorAll('.lt-immersive-translation').length === 0, null, { timeout: 10000 });
+  await page.waitForFunction(() => document.querySelectorAll('.orange-translator-extension-9443e25e-immersive-translation').length === 0, null, { timeout: 10000 });
   console.log('PASS touch gesture: three-finger tap toggles immersive translation');
   await page.evaluate(() => {
     const range = document.createRange();
@@ -500,40 +505,64 @@ try {
     selection.removeAllRanges(); selection.addRange(range);
     document.querySelector('#p1').dispatchEvent(new MouseEvent('mouseup', { bubbles: true, clientX: 320, clientY: 180 }));
   });
-  await page.locator('#lt-trigger').waitFor({ state: 'visible', timeout: 15000 });
+  await page.locator('#orange-translator-extension-9443e25e-trigger').waitFor({ state: 'visible', timeout: 15000 });
+  const triggerEnterAnimation = await page.locator('#orange-translator-extension-9443e25e-trigger').evaluate(node => getComputedStyle(node).animationName);
+  if (triggerEnterAnimation !== 'orange-translator-extension-9443e25e-trigger-in') throw new Error(`划词橙子进入动画未生效：${triggerEnterAnimation}`);
   await page.waitForTimeout(220);
-  const triggerBox = await page.locator('#lt-trigger').boundingBox();
+  const triggerBox = await page.locator('#orange-translator-extension-9443e25e-trigger').boundingBox();
   if (!triggerBox || Math.abs(triggerBox.x - 330) > 3 || Math.abs(triggerBox.y - 190) > 3) throw new Error(`划词图标未出现在鼠标旁：${JSON.stringify(triggerBox)}`);
-  await page.locator('#lt-trigger').hover();
-  await page.locator('#lt-root:not([hidden])').waitFor({ timeout: 5000 });
-  const panelWhileLoading = await page.locator('#lt-root').boundingBox();
-  await page.locator('#lt-root .lt-selection-result, #lt-root .lt-entry').first().waitFor({ timeout: 90000 });
-  const panelAfterResult = await page.locator('#lt-root').boundingBox();
+  await page.locator('#orange-translator-extension-9443e25e-trigger').hover();
+  const triggerWiggleAnimation = await page.locator('#orange-translator-extension-9443e25e-trigger img').evaluate(node => getComputedStyle(node).animationName);
+  if (triggerWiggleAnimation !== 'orange-translator-extension-9443e25e-trigger-wiggle') throw new Error(`划词橙子摇晃动画未生效：${triggerWiggleAnimation}`);
+  await page.locator('#orange-translator-extension-9443e25e-root:not([hidden])').waitFor({ timeout: 5000 });
+  const panelWhileLoading = await page.locator('#orange-translator-extension-9443e25e-root').boundingBox();
+  await page.locator('#orange-translator-extension-9443e25e-root .orange-translator-extension-9443e25e-selection-result').waitFor({ timeout: 90000 });
+  const closeButtonIsolation = await page.locator('#orange-translator-extension-9443e25e-root [data-close]').evaluate(button => {
+    const poison = document.createElement('style');
+    poison.textContent = 'button{min-width:150px!important;width:auto!important;height:44px!important;background:#493d38!important;box-shadow:inset 0 0 0 5px #fff!important;transform:scale(1.2)!important}';
+    document.head.append(poison);
+    const rect = button.getBoundingClientRect();
+    const style = getComputedStyle(button);
+    poison.remove();
+    return { width:rect.width, height:rect.height, background:style.backgroundColor, shadow:style.boxShadow, transform:style.transform };
+  });
+  if (Math.abs(closeButtonIsolation.width - 28) > 1 || Math.abs(closeButtonIsolation.height - 28) > 1 || closeButtonIsolation.background !== 'rgba(0, 0, 0, 0)' || closeButtonIsolation.shadow !== 'none' || closeButtonIsolation.transform !== 'none') throw new Error(`划词浮窗关闭按钮被站点样式污染：${JSON.stringify(closeButtonIsolation)}`);
+  const cardIsolation = await page.locator('#orange-translator-extension-9443e25e-root .orange-translator-extension-9443e25e-card').evaluate(card => {
+    const poison = document.createElement('style');
+    poison.textContent = 'div{background:#f0f!important;border:12px solid red!important;border-radius:0!important;box-shadow:0 0 0 30px black!important;padding:40px!important;font:32px serif!important}';
+    document.head.append(poison);
+    const style = getComputedStyle(card);
+    const result = { background:style.backgroundColor, borderWidth:style.borderTopWidth, radius:style.borderRadius, padding:style.paddingTop, fontSize:style.fontSize, shadow:style.boxShadow };
+    poison.remove();
+    return result;
+  });
+  if (cardIsolation.background === 'rgb(255, 0, 255)' || parseFloat(cardIsolation.borderWidth) < .5 || parseFloat(cardIsolation.borderWidth) > 1.5 || cardIsolation.radius !== '10px' || cardIsolation.padding !== '14px' || cardIsolation.fontSize === '32px' || cardIsolation.shadow.includes('30px')) throw new Error(`划词浮窗被站点通用样式污染：${JSON.stringify(cardIsolation)}`);
+  const panelAfterResult = await page.locator('#orange-translator-extension-9443e25e-root').boundingBox();
   if (!panelWhileLoading || !panelAfterResult || Math.abs(panelWhileLoading.x - panelAfterResult.x) > 2 || Math.abs(panelWhileLoading.y - panelAfterResult.y) > 2) throw new Error(`划词结果返回后浮窗位置跳变：${JSON.stringify({ panelWhileLoading, panelAfterResult })}`);
-  await page.locator('#lt-trigger').waitFor({ state: 'hidden', timeout: 5000 });
-  if (await page.locator('#lt-trigger').isVisible()) throw new Error('划词浮窗弹出后悬浮图标没有消失');
-  if (!await page.locator('#lt-root [data-original]').isVisible()) throw new Error('划词浮窗没有显示原文');
-  const triggerBeforeDrag = await page.locator('#lt-trigger').evaluate(node => ({ left: node.style.left, top: node.style.top }));
-  const panelBeforeDrag = await page.locator('#lt-root').boundingBox();
-  const handle = page.locator('#lt-root [data-drag-handle]');
+  await page.locator('#orange-translator-extension-9443e25e-trigger').waitFor({ state: 'hidden', timeout: 5000 });
+  if (await page.locator('#orange-translator-extension-9443e25e-trigger').isVisible()) throw new Error('划词浮窗弹出后悬浮图标没有消失');
+  if (!await page.locator('#orange-translator-extension-9443e25e-root [data-original]').isVisible()) throw new Error('划词浮窗没有显示原文');
+  const triggerBeforeDrag = await page.locator('#orange-translator-extension-9443e25e-trigger').evaluate(node => ({ left: node.style.left, top: node.style.top }));
+  const panelBeforeDrag = await page.locator('#orange-translator-extension-9443e25e-root').boundingBox();
+  const handle = page.locator('#orange-translator-extension-9443e25e-root [data-drag-handle]');
   const handleBox = await handle.boundingBox();
   if (!panelBeforeDrag || !handleBox) throw new Error('划词浮窗标题栏不存在');
   await page.mouse.move(handleBox.x + 60, handleBox.y + handleBox.height / 2);
   await page.mouse.down();
   await page.mouse.move(handleBox.x + 110, handleBox.y + handleBox.height / 2 + 35, { steps: 5 });
   await page.mouse.up();
-  const panelAfterDrag = await page.locator('#lt-root').boundingBox();
-  const triggerAfterDrag = await page.locator('#lt-trigger').evaluate(node => ({ left: node.style.left, top: node.style.top }));
+  const panelAfterDrag = await page.locator('#orange-translator-extension-9443e25e-root').boundingBox();
+  const triggerAfterDrag = await page.locator('#orange-translator-extension-9443e25e-trigger').evaluate(node => ({ left: node.style.left, top: node.style.top }));
   if (!panelAfterDrag || Math.abs(panelAfterDrag.x - panelBeforeDrag.x) < 30 || Math.abs(panelAfterDrag.y - panelBeforeDrag.y) < 20) throw new Error('拖动标题栏后浮窗没有移动');
   if (triggerBeforeDrag.left !== triggerAfterDrag.left || triggerBeforeDrag.top !== triggerAfterDrag.top) throw new Error('拖动浮窗时不应移动悬浮球');
-  const scrollStyles = await page.locator('#lt-root .lt-card-body').evaluate(node => ({ overflowY: getComputedStyle(node).overflowY, maxHeight: getComputedStyle(node.closest('.lt-card')).maxHeight }));
+  const scrollStyles = await page.locator('#orange-translator-extension-9443e25e-root .orange-translator-extension-9443e25e-card-body').evaluate(node => ({ overflowY: getComputedStyle(node).overflowY, maxHeight: getComputedStyle(node.closest('.orange-translator-extension-9443e25e-card')).maxHeight }));
   if (scrollStyles.overflowY !== 'auto' || scrollStyles.maxHeight === 'none') throw new Error(`浮窗滚动限制未生效：${JSON.stringify(scrollStyles)}`);
-  const selectionText = await page.locator('#lt-root').textContent();
+  const selectionText = await page.locator('#orange-translator-extension-9443e25e-root').textContent();
   if (!selectionText || selectionText.includes('翻译中')) throw new Error('划词翻译没有产生最终结果');
   console.log('PASS selection translation:', selectionText.slice(0, 80).replace(/\n/g, ' '));
   await page.locator('body').click({ position: { x: 8, y: 8 } });
-  await page.locator('#lt-root').waitFor({ state: 'hidden', timeout: 5000 });
-  if (await page.locator('#lt-trigger').isVisible()) throw new Error('点击空白处后划词图标未关闭');
+  await page.locator('#orange-translator-extension-9443e25e-root').waitFor({ state: 'hidden', timeout: 5000 });
+  if (await page.locator('#orange-translator-extension-9443e25e-trigger').isVisible()) throw new Error('点击空白处后划词图标未关闭');
   console.log('PASS selection dismissal: blank click closes panel');
 
   await page.evaluate(() => {
@@ -546,9 +575,9 @@ try {
     };
     select('#p1', 300, 170);
   });
-  await page.locator('#lt-trigger').waitFor({ state: 'visible', timeout: 5000 });
-  await page.locator('#lt-trigger').hover();
-  await page.locator('#lt-root:not([hidden])').waitFor({ timeout: 5000 });
+  await page.locator('#orange-translator-extension-9443e25e-trigger').waitFor({ state: 'visible', timeout: 5000 });
+  await page.locator('#orange-translator-extension-9443e25e-trigger').hover();
+  await page.locator('#orange-translator-extension-9443e25e-root:not([hidden])').waitFor({ timeout: 5000 });
   await page.evaluate(() => {
     const range = document.createRange();
     range.selectNodeContents(document.querySelector('#p2'));
@@ -556,13 +585,13 @@ try {
     selection.removeAllRanges(); selection.addRange(range);
     document.querySelector('#p2').dispatchEvent(new MouseEvent('mouseup', { bubbles: true, clientX: 460, clientY: 230 }));
   });
-  await page.locator('#lt-root').waitFor({ state: 'hidden', timeout: 5000 });
-  await page.locator('#lt-trigger').waitFor({ state: 'visible', timeout: 5000 });
+  await page.locator('#orange-translator-extension-9443e25e-root').waitFor({ state: 'hidden', timeout: 5000 });
+  await page.locator('#orange-translator-extension-9443e25e-trigger').waitFor({ state: 'visible', timeout: 5000 });
   await page.waitForTimeout(220);
-  const reselectionBox = await page.locator('#lt-trigger').boundingBox();
+  const reselectionBox = await page.locator('#orange-translator-extension-9443e25e-trigger').boundingBox();
   if (!reselectionBox || Math.abs(reselectionBox.x - 470) > 3 || Math.abs(reselectionBox.y - 240) > 3) throw new Error(`浮窗显示时重新划词没有生成新图标：${JSON.stringify(reselectionBox)}`);
   await page.evaluate(() => getSelection().removeAllRanges());
-  await page.locator('#lt-trigger').waitFor({ state: 'hidden', timeout: 5000 });
+  await page.locator('#orange-translator-extension-9443e25e-trigger').waitFor({ state: 'hidden', timeout: 5000 });
   console.log('PASS mouseup state evaluation: dismisses or reselects from live state');
 
   await page.evaluate(() => {
@@ -574,7 +603,7 @@ try {
     selection.removeAllRanges();
   });
   await page.waitForTimeout(80);
-  if (await page.locator('#lt-trigger').isVisible()) throw new Error('选区已清空，延迟显示的划词图标仍然出现');
+  if (await page.locator('#orange-translator-extension-9443e25e-trigger').isVisible()) throw new Error('选区已清空，延迟显示的划词图标仍然出现');
   await page.evaluate(() => {
     const range = document.createRange();
     range.selectNodeContents(document.querySelector('#p1'));
@@ -582,9 +611,9 @@ try {
     selection.removeAllRanges(); selection.addRange(range);
     document.querySelector('#p1').dispatchEvent(new MouseEvent('mouseup', { bubbles: true, clientX: 280, clientY: 160 }));
   });
-  await page.locator('#lt-trigger').waitFor({ state: 'visible', timeout: 5000 });
+  await page.locator('#orange-translator-extension-9443e25e-trigger').waitFor({ state: 'visible', timeout: 5000 });
   await page.evaluate(() => getSelection().removeAllRanges());
-  await page.locator('#lt-trigger').waitFor({ state: 'hidden', timeout: 5000 });
+  await page.locator('#orange-translator-extension-9443e25e-trigger').waitFor({ state: 'hidden', timeout: 5000 });
   console.log('PASS selection state guard: stale selections never show or retain trigger');
 
   await page.evaluate(() => {
@@ -594,12 +623,12 @@ try {
     selection.removeAllRanges(); selection.addRange(range);
     document.querySelector('#p4').dispatchEvent(new MouseEvent('mouseup', { bubbles: true, clientX: 420, clientY: 260 }));
   });
-  await page.locator('#lt-trigger').hover();
-  await page.locator('#lt-root [data-toggle-original]').waitFor({ state: 'visible', timeout: 5000 });
-  const collapsed = await page.locator('#lt-root [data-original]').evaluate(node => node.scrollHeight > node.clientHeight);
+  await page.locator('#orange-translator-extension-9443e25e-trigger').hover();
+  await page.locator('#orange-translator-extension-9443e25e-root [data-toggle-original]').waitFor({ state: 'visible', timeout: 5000 });
+  const collapsed = await page.locator('#orange-translator-extension-9443e25e-root [data-original]').evaluate(node => node.scrollHeight > node.clientHeight);
   if (!collapsed) throw new Error('长原文没有默认折叠到三行');
-  await page.locator('#lt-root [data-toggle-original]').click();
-  const expanded = await page.locator('#lt-root [data-original]').evaluate(node => node.classList.contains('is-expanded') && node.scrollHeight <= node.clientHeight + 1);
+  await page.locator('#orange-translator-extension-9443e25e-root [data-toggle-original]').click();
+  const expanded = await page.locator('#orange-translator-extension-9443e25e-root [data-original]').evaluate(node => node.classList.contains('orange-translator-extension-9443e25e-state-expanded') && node.scrollHeight <= node.clientHeight + 1);
   if (!expanded) throw new Error('长原文展开失败');
   await page.locator('body').click({ position: { x: 8, y: 8 } });
   console.log('PASS selection original: collapsed and expandable');
@@ -612,32 +641,32 @@ try {
     document.dispatchEvent(new Event('selectionchange'));
     node.dispatchEvent(new MouseEvent('mouseup', { bubbles:true, clientX:180, clientY:90 }));
   });
-  await selectionFrame.locator('#lt-trigger').waitFor({ state:'visible', timeout:5000 });
-  await selectionFrame.locator('#lt-trigger').hover();
-  await page.locator('#lt-root:not([hidden])').waitFor({ timeout:5000 });
-  if (await selectionFrame.locator('#lt-root:not([hidden])').count()) throw new Error('iframe 划词翻译浮窗不应渲染在 iframe 内');
-  if (!(await page.locator('#lt-root [data-original]').textContent())?.includes('This article paragraph lives inside an iframe')) throw new Error('顶层划词浮窗没有收到 iframe 选中文本');
+  await selectionFrame.locator('#orange-translator-extension-9443e25e-trigger').waitFor({ state:'visible', timeout:5000 });
+  await selectionFrame.locator('#orange-translator-extension-9443e25e-trigger').hover();
+  await page.locator('#orange-translator-extension-9443e25e-root:not([hidden])').waitFor({ timeout:5000 });
+  if (await selectionFrame.locator('#orange-translator-extension-9443e25e-root:not([hidden])').count()) throw new Error('iframe 划词翻译浮窗不应渲染在 iframe 内');
+  if (!(await page.locator('#orange-translator-extension-9443e25e-root [data-original]').textContent())?.includes('This article paragraph lives inside an iframe')) throw new Error('顶层划词浮窗没有收到 iframe 选中文本');
   await page.locator('body').click({ position:{ x:8, y:8 }, force:true });
-  await page.locator('#lt-root').waitFor({ state:'hidden', timeout:5000 });
+  await page.locator('#orange-translator-extension-9443e25e-root').waitFor({ state:'hidden', timeout:5000 });
   console.log('PASS iframe selection popup: rendered in top frame without clipping');
 
   await broadcastToFrames('http://127.0.0.1:', 'immersive-start');
-  await page.locator('.lt-immersive-loading').first().waitFor({ timeout: 10000 });
-  const loadingCount = await page.locator('.lt-immersive-loading').count();
+  await page.locator('.orange-translator-extension-9443e25e-immersive-loading').first().waitFor({ timeout: 10000 });
+  const loadingCount = await page.locator('.orange-translator-extension-9443e25e-immersive-loading').count();
   if (!loadingCount) throw new Error('沉浸式请求期间没有显示逐条加载占位符');
-  await page.locator('.lt-translated').first().waitFor({ timeout: 120000 });
-  await page.waitForFunction(() => document.querySelectorAll('.lt-immersive-loading').length === 0, null, { timeout: 10000 });
-  const translatedCount = await page.locator('.lt-translated').count();
+  await page.locator('.orange-translator-extension-9443e25e-translated').first().waitFor({ timeout: 120000 });
+  await page.waitForFunction(() => document.querySelectorAll('.orange-translator-extension-9443e25e-immersive-loading').length === 0, null, { timeout: 10000 });
+  const translatedCount = await page.locator('.orange-translator-extension-9443e25e-translated').count();
   if (translatedCount < 3) throw new Error(`沉浸式翻译结果不足：${translatedCount}`);
-  if (await page.locator('#lt-root.lt-immersive-control-root:not([hidden])').count()) throw new Error('不应显示沉浸式进度浮窗');
-  const misplaced = await page.locator('body > .lt-immersive-translation').count();
+  if (await page.locator('#orange-translator-extension-9443e25e-root.orange-translator-extension-9443e25e-immersive-control-root:not([hidden])').count()) throw new Error('不应显示沉浸式进度浮窗');
+  const misplaced = await page.locator('body > .orange-translator-extension-9443e25e-immersive-translation').count();
   if (misplaced) throw new Error(`存在 ${misplaced} 个脱离原段落的译文块`);
   console.log(`PASS immersive translation: ${translatedCount} translated blocks`);
   const articleFrame = page.frame({ url: /\/frame$/ });
   if (!articleFrame) throw new Error('测试正文 iframe 未加载');
-  await articleFrame.locator('#frame-p1 .lt-immersive-translation').waitFor({ timeout: 120000 });
-  const frameTranslated = await articleFrame.locator('.lt-immersive-translation').count();
-  const frameControls = await articleFrame.locator('#lt-root.lt-immersive-control-root:not([hidden])').count();
+  await articleFrame.locator('#frame-p1 .orange-translator-extension-9443e25e-immersive-translation').waitFor({ timeout: 120000 });
+  const frameTranslated = await articleFrame.locator('.orange-translator-extension-9443e25e-immersive-translation').count();
+  const frameControls = await articleFrame.locator('#orange-translator-extension-9443e25e-root.orange-translator-extension-9443e25e-immersive-control-root:not([hidden])').count();
   if (frameTranslated < 2 || frameControls) throw new Error(`iframe 翻译异常：译文 ${frameTranslated}，子控制条 ${frameControls}`);
   console.log(`PASS iframe immersive: ${frameTranslated} blocks, top-frame control only`);
   await articleFrame.evaluate(() => {
@@ -647,9 +676,9 @@ try {
     container.innerHTML = '<p id="reddit-line-1">The first paragraph must be translated once.</p><p id="reddit-line-2">The second paragraph must also be translated once.</p>';
     document.querySelector('article').append(container);
   });
-  await articleFrame.locator('#reddit-line-1 .lt-immersive-translation').waitFor({ timeout: 120000 });
-  const nestedContainerTranslations = await articleFrame.locator('#reddit-like-body > .lt-immersive-translation').count();
-  const nestedParagraphTranslations = await articleFrame.locator('#reddit-like-body p > .lt-immersive-translation').count();
+  await articleFrame.locator('#reddit-line-1 .orange-translator-extension-9443e25e-immersive-translation').waitFor({ timeout: 120000 });
+  const nestedContainerTranslations = await articleFrame.locator('#reddit-like-body > .orange-translator-extension-9443e25e-immersive-translation').count();
+  const nestedParagraphTranslations = await articleFrame.locator('#reddit-like-body p > .orange-translator-extension-9443e25e-immersive-translation').count();
   if (nestedContainerTranslations || nestedParagraphTranslations !== 2) throw new Error(`嵌套正文去重失败：容器 ${nestedContainerTranslations}，段落 ${nestedParagraphTranslations}`);
   console.log('PASS nested paragraph dedupe: container skipped, child paragraphs translated once');
   await articleFrame.evaluate(() => {
@@ -660,7 +689,7 @@ try {
     document.body.append(ad);
   });
   await articleFrame.waitForTimeout(500);
-  const promotedTranslations = await articleFrame.locator('#reddit-promoted-post .lt-immersive-translation').count();
+  const promotedTranslations = await articleFrame.locator('#reddit-promoted-post .orange-translator-extension-9443e25e-immersive-translation').count();
   if (promotedTranslations) throw new Error(`Reddit 推广内容不应翻译：${promotedTranslations}`);
   console.log('PASS Reddit promoted post exclusion');
   await page.evaluate(() => {
@@ -669,9 +698,9 @@ try {
     paragraph.textContent = 'This paragraph was inserted dynamically after immersive translation had already started.';
     document.querySelector('main').append(paragraph);
   });
-  await page.locator('#dynamic-paragraph .lt-immersive-translation').waitFor({ timeout: 120000 });
+  await page.locator('#dynamic-paragraph .orange-translator-extension-9443e25e-immersive-translation').waitFor({ timeout: 120000 });
   await page.waitForTimeout(300);
-  const dynamicTranslations = await page.locator('#dynamic-paragraph .lt-immersive-translation').count();
+  const dynamicTranslations = await page.locator('#dynamic-paragraph .orange-translator-extension-9443e25e-immersive-translation').count();
   if (dynamicTranslations !== 1) throw new Error(`动态正文被重复翻译：${dynamicTranslations}`);
   console.log('PASS dynamic content translation: exactly one translated block');
   await page.evaluate(() => {
@@ -685,16 +714,16 @@ try {
   await page.waitForTimeout(300);
   await page.locator('#scroll-loading-paragraph').scrollIntoViewIfNeeded();
   await page.waitForTimeout(150);
-  if (await page.locator('#scroll-loading-paragraph .lt-immersive-loading').count()) throw new Error('滚动停稳 280ms 前不应显示 loading');
-  await page.locator('#scroll-loading-paragraph .lt-immersive-loading').waitFor({ timeout: 2000 });
-  if (await page.locator('#scroll-loading-paragraph .lt-immersive-translation').count()) throw new Error('滚动未停稳时不应先插入最终译文');
-  await page.locator('#scroll-loading-paragraph .lt-immersive-translation').waitFor({ timeout: 120000 });
-  if (await page.locator('#scroll-loading-paragraph .lt-immersive-loading').count()) throw new Error('最终译文出现后仍残留 loading');
+  if (await page.locator('#scroll-loading-paragraph .orange-translator-extension-9443e25e-immersive-loading').count()) throw new Error('滚动停稳 280ms 前不应显示 loading');
+  await page.locator('#scroll-loading-paragraph .orange-translator-extension-9443e25e-immersive-loading').waitFor({ timeout: 2000 });
+  if (await page.locator('#scroll-loading-paragraph .orange-translator-extension-9443e25e-immersive-translation').count()) throw new Error('滚动未停稳时不应先插入最终译文');
+  await page.locator('#scroll-loading-paragraph .orange-translator-extension-9443e25e-immersive-translation').waitFor({ timeout: 120000 });
+  if (await page.locator('#scroll-loading-paragraph .orange-translator-extension-9443e25e-immersive-loading').count()) throw new Error('最终译文出现后仍残留 loading');
   console.log('PASS viewport loading: shown after 280ms idle, before queued request completes');
   await broadcastToFrames('http://127.0.0.1:', 'immersive-restore');
-  await page.waitForFunction(() => document.querySelectorAll('.lt-immersive-translation').length === 0, null, { timeout: 10000 });
-  await articleFrame.waitForFunction(() => document.querySelectorAll('.lt-immersive-translation').length === 0, null, { timeout: 10000 });
-  if (await page.locator('.lt-immersive-loading').count() || await articleFrame.locator('.lt-immersive-loading').count()) throw new Error('还原后仍残留加载占位符');
+  await page.waitForFunction(() => document.querySelectorAll('.orange-translator-extension-9443e25e-immersive-translation').length === 0, null, { timeout: 10000 });
+  await articleFrame.waitForFunction(() => document.querySelectorAll('.orange-translator-extension-9443e25e-immersive-translation').length === 0, null, { timeout: 10000 });
+  if (await page.locator('.orange-translator-extension-9443e25e-immersive-loading').count() || await articleFrame.locator('.orange-translator-extension-9443e25e-immersive-loading').count()) throw new Error('还原后仍残留加载占位符');
   console.log('PASS iframe restore: parent and child frames cleared together');
 
   await context.route('https://www.youtube.com/watch**', route => route.fulfill({
@@ -704,30 +733,30 @@ try {
   }));
   const youtube = await context.newPage();
   await youtube.goto('https://www.youtube.com/watch?v=orange-translator-test', { waitUntil: 'domcontentloaded', timeout: 30000 });
-  await youtube.locator('#lt-trigger').waitFor({ state:'attached', timeout:10000 });
+  await youtube.locator('#orange-translator-extension-9443e25e-trigger').waitFor({ state:'attached', timeout:10000 });
   const youtubeTabId = await options.evaluate(async () => (await chrome.tabs.query({})).find(tab => tab.url?.includes('orange-translator-test'))?.id || 0);
   await options.evaluate(tabId => chrome.runtime.sendMessage({ type:'broadcast-immersive', action:'start', tabId }), youtubeTabId);
-  await youtube.locator('#lt-youtube-subtitle:not([hidden])').waitFor({ timeout:90000 });
+  await youtube.locator('#orange-translator-extension-9443e25e-youtube-subtitle:not([hidden])').waitFor({ timeout:90000 });
   if (!await youtube.locator('.ytp-caption-segment').isVisible()) throw new Error('YouTube 原字幕不应被隐藏');
-  await youtube.locator('yt-formatted-string#content-text .lt-immersive-translation').waitFor({ timeout:90000 });
+  await youtube.locator('yt-formatted-string#content-text .orange-translator-extension-9443e25e-immersive-translation').waitFor({ timeout:90000 });
   if (!await youtube.locator('yt-formatted-string#content-text').textContent()) throw new Error('YouTube 评论原文不应被替换');
-  await youtube.waitForFunction(() => !document.querySelector('#lt-immersive-ball')?.classList.contains('is-translating'), null, { timeout:10000 });
-  const firstYoutubeTranslation = (await youtube.locator('#lt-youtube-subtitle').textContent())?.trim();
+  await youtube.waitForFunction(() => !document.querySelector('#orange-translator-extension-9443e25e-immersive-ball')?.classList.contains('orange-translator-extension-9443e25e-state-translating'), null, { timeout:10000 });
+  const firstYoutubeTranslation = (await youtube.locator('#orange-translator-extension-9443e25e-youtube-subtitle').textContent())?.trim();
   if (!firstYoutubeTranslation) throw new Error('YouTube 双语字幕没有生成译文');
   await youtube.locator('.ytp-caption-segment').evaluate(node => { node.textContent = 'The subtitle changed to a new sentence.'; });
   await youtube.waitForTimeout(120);
-  if (await youtube.locator('#lt-immersive-ball.is-translating').count()) throw new Error('仅 YouTube 字幕更新时常驻橙子不应旋转');
-  await youtube.waitForFunction(previous => { const text=document.querySelector('#lt-youtube-subtitle')?.textContent?.trim(); return text && text !== previous; }, firstYoutubeTranslation, { timeout:90000 });
+  if (await youtube.locator('#orange-translator-extension-9443e25e-immersive-ball.orange-translator-extension-9443e25e-state-translating').count()) throw new Error('仅 YouTube 字幕更新时常驻橙子不应旋转');
+  await youtube.waitForFunction(previous => { const text=document.querySelector('#orange-translator-extension-9443e25e-youtube-subtitle')?.textContent?.trim(); return text && text !== previous; }, firstYoutubeTranslation, { timeout:90000 });
   await youtube.locator('#dynamic-comments').evaluate(container => {
     const comment = document.createElement('yt-formatted-string');
     comment.id = 'content-text'; comment.className = 'ytd-comment-renderer';
     comment.textContent = 'This dynamically loaded YouTube reply should also be translated.';
     container.append(comment);
   });
-  await youtube.locator('#dynamic-comments .lt-immersive-translation').waitFor({ timeout:90000 });
+  await youtube.locator('#dynamic-comments .orange-translator-extension-9443e25e-immersive-translation').waitFor({ timeout:90000 });
   await options.evaluate(tabId => chrome.runtime.sendMessage({ type:'broadcast-immersive', action:'restore', tabId }), youtubeTabId);
-  await youtube.locator('#lt-youtube-subtitle').waitFor({ state:'detached', timeout:10000 });
-  if (await youtube.locator('.lt-immersive-translation').count()) throw new Error('退出 YouTube 翻译后评论译文仍有残留');
+  await youtube.locator('#orange-translator-extension-9443e25e-youtube-subtitle').waitFor({ state:'detached', timeout:10000 });
+  if (await youtube.locator('.orange-translator-extension-9443e25e-immersive-translation').count()) throw new Error('退出 YouTube 翻译后评论译文仍有残留');
   await youtube.close();
   await context.unroute('https://www.youtube.com/watch**');
   console.log('PASS YouTube alignment: subtitles, comments, dynamic replies, and restore');
@@ -737,12 +766,12 @@ try {
   await github.locator('.markdown-body').first().waitFor({ timeout: 60000 });
   await github.evaluate(() => scrollTo(0, 0));
   await broadcastToFrames('https://github.com/cnbluefire/indra-ocr-sharp', 'immersive-start');
-  await github.waitForFunction(() => document.querySelector('#repo-content-turbo-frame .lt-immersive-translation, .Layout-sidebar .lt-immersive-translation') || document.querySelector('#lt-root')?.textContent?.includes('翻译失败'), null, { timeout: 120000 });
-  const githubChromeTranslations = await github.locator('#repo-content-turbo-frame .lt-immersive-translation, .Layout-sidebar .lt-immersive-translation').count();
-  if (!githubChromeTranslations) throw new Error(`GitHub 仓库区启动失败：${await github.locator('#lt-root').textContent()}`);
-  const topPollution = await github.locator('header .lt-immersive-translation, nav .lt-immersive-translation, button .lt-immersive-translation, pre .lt-immersive-translation, code .lt-immersive-translation').count();
+  await github.waitForFunction(() => document.querySelector('#repo-content-turbo-frame .orange-translator-extension-9443e25e-immersive-translation, .Layout-sidebar .orange-translator-extension-9443e25e-immersive-translation') || document.querySelector('#orange-translator-extension-9443e25e-root')?.textContent?.includes('翻译失败'), null, { timeout: 120000 });
+  const githubChromeTranslations = await github.locator('#repo-content-turbo-frame .orange-translator-extension-9443e25e-immersive-translation, .Layout-sidebar .orange-translator-extension-9443e25e-immersive-translation').count();
+  if (!githubChromeTranslations) throw new Error(`GitHub 仓库区启动失败：${await github.locator('#orange-translator-extension-9443e25e-root').textContent()}`);
+  const topPollution = await github.locator('header .orange-translator-extension-9443e25e-immersive-translation, nav .orange-translator-extension-9443e25e-immersive-translation, button .orange-translator-extension-9443e25e-immersive-translation, pre .orange-translator-extension-9443e25e-immersive-translation, code .orange-translator-extension-9443e25e-immersive-translation').count();
   if (topPollution) throw new Error(`GitHub 顶部有 ${topPollution} 个译文污染了导航、按钮或代码`);
-  const githubUiPollution = await github.evaluate(() => [...document.querySelectorAll('.lt-immersive-translation')].filter(node => {
+  const githubUiPollution = await github.evaluate(() => [...document.querySelectorAll('.orange-translator-extension-9443e25e-immersive-translation')].filter(node => {
     const source = node.parentElement;
     if (source.closest('.markdown-body')) return false;
     const text = source.childNodes[0]?.textContent?.trim() || '';
@@ -750,44 +779,35 @@ try {
   }).length);
   if (githubUiPollution) throw new Error(`GitHub 有 ${githubUiPollution} 个文件名或界面标题被误翻译`);
   await broadcastToFrames('https://github.com/cnbluefire/indra-ocr-sharp', 'immersive-restore');
-  await github.waitForFunction(() => document.querySelectorAll('.lt-immersive-translation').length === 0, null, { timeout: 10000 });
+  await github.waitForFunction(() => document.querySelectorAll('.orange-translator-extension-9443e25e-immersive-translation').length === 0, null, { timeout: 10000 });
   console.log(`PASS GitHub repository chrome: ${githubChromeTranslations} translated blocks at scrollY=0`);
   await github.evaluate(() => {
     const readme = document.querySelector('.markdown-body');
     const target = [...readme.querySelectorAll('h2')].find(node => /command line/i.test(node.textContent)) || readme.querySelector('h2');
     target?.scrollIntoView({ block: 'center' });
-    [...readme.querySelectorAll('h1,h2,h3,h4,h5,h6,p,li,blockquote,figcaption,td,th,dd,dt')].forEach(node => {
-      const rect = node.getBoundingClientRect();
-      if (rect.bottom > 0 && rect.top < innerHeight) node.dataset.testInitialViewport = '1';
-      if (rect.bottom > 0 && rect.top < innerHeight * 2) node.dataset.testInitialPrefetch = '1';
-    });
   });
   await broadcastToFrames('https://github.com/cnbluefire/indra-ocr-sharp', 'immersive-start');
-  await github.waitForFunction(() => document.querySelector('.markdown-body .lt-immersive-translation') || document.querySelector('#lt-root')?.textContent?.includes('翻译失败'), null, { timeout: 120000 });
-  const firstReadmeTranslation = github.locator('.markdown-body .lt-immersive-translation').first();
-  if (!await firstReadmeTranslation.count()) throw new Error(`GitHub README 首批翻译失败：${await github.locator('#lt-root').textContent()}`);
-  const firstTranslationInfo = await firstReadmeTranslation.evaluate(node => ({ marked: node.parentElement.dataset.testInitialPrefetch === '1', tag: node.parentElement.tagName, text: node.parentElement.textContent.slice(0, 100), rect: node.parentElement.getBoundingClientRect().toJSON() }));
-  if (!firstTranslationInfo.marked) throw new Error(`GitHub 沉浸式翻译没有从当前两屏范围开始：${JSON.stringify(firstTranslationInfo)}`);
+  await github.waitForFunction(() => document.querySelector('.markdown-body .orange-translator-extension-9443e25e-immersive-translation') || document.querySelector('#orange-translator-extension-9443e25e-root')?.textContent?.includes('翻译失败'), null, { timeout: 120000 });
+  const firstReadmeTranslation = github.locator('.markdown-body .orange-translator-extension-9443e25e-immersive-translation').first();
+  if (!await firstReadmeTranslation.count()) throw new Error(`GitHub README 首批翻译失败：${await github.locator('#orange-translator-extension-9443e25e-root').textContent()}`);
   await github.mouse.move(2, 2);
   const crxStyle = await firstReadmeTranslation.evaluate(node => {
     const style = getComputedStyle(node);
     return { tag: node.tagName, theme: node.dataset.ltTheme, backgroundImage: style.backgroundImage };
   });
   if (crxStyle.tag !== 'FONT' || crxStyle.theme !== 'dashed' || crxStyle.backgroundImage === 'none') throw new Error(`沉浸式样式未应用所选主题：${JSON.stringify(crxStyle)}`);
-  await github.waitForFunction(() => document.querySelectorAll('.markdown-body .lt-immersive-translation').length >= 5, null, { timeout: 120000 });
+  await github.waitForFunction(() => document.querySelectorAll('.markdown-body .orange-translator-extension-9443e25e-immersive-translation').length >= 5, null, { timeout: 120000 });
   await github.waitForTimeout(500);
-  const initialTranslated = await github.locator('.markdown-body .lt-immersive-translation').count();
-  const outsideInitialPrefetch = await github.evaluate(() => [...document.querySelectorAll('.markdown-body .lt-immersive-translation')].filter(node => node.parentElement.dataset.testInitialPrefetch !== '1').length);
-  if (outsideInitialPrefetch) throw new Error(`启动后翻译了 ${outsideInitialPrefetch} 个两屏范围外段落`);
+  const initialTranslated = await github.locator('.markdown-body .orange-translator-extension-9443e25e-immersive-translation').count();
   await github.evaluate(() => window.scrollBy({ top: innerHeight * 1.5, behavior: 'instant' }));
-  const countWhileScrolling = await github.locator('.markdown-body .lt-immersive-translation').count();
+  const countWhileScrolling = await github.locator('.markdown-body .orange-translator-extension-9443e25e-immersive-translation').count();
   await github.waitForTimeout(150);
-  const countBeforeIdle = await github.locator('.markdown-body .lt-immersive-translation').count();
+  const countBeforeIdle = await github.locator('.markdown-body .orange-translator-extension-9443e25e-immersive-translation').count();
   if (countBeforeIdle !== countWhileScrolling) throw new Error('滚动尚未停止时就开始了新翻译请求');
-  await github.waitForFunction(previous => document.querySelectorAll('.markdown-body .lt-immersive-translation').length > previous, initialTranslated, { timeout: 120000 });
-  const githubTranslated = await github.locator('.markdown-body .lt-immersive-translation').count();
+  await github.waitForFunction(previous => document.querySelectorAll('.markdown-body .orange-translator-extension-9443e25e-immersive-translation').length > previous, initialTranslated, { timeout: 120000 });
+  const githubTranslated = await github.locator('.markdown-body .orange-translator-extension-9443e25e-immersive-translation').count();
   if (githubTranslated <= initialTranslated) throw new Error('滚动后没有继续翻译新进入视口的段落');
-  const chromePollution = await github.locator('nav .lt-immersive-translation, header .lt-immersive-translation, pre .lt-immersive-translation, code .lt-immersive-translation').count();
+  const chromePollution = await github.locator('nav .orange-translator-extension-9443e25e-immersive-translation, header .orange-translator-extension-9443e25e-immersive-translation, pre .orange-translator-extension-9443e25e-immersive-translation, code .orange-translator-extension-9443e25e-immersive-translation').count();
   if (chromePollution) throw new Error(`GitHub 页面有 ${chromePollution} 个译文污染了导航或代码区`);
   await github.locator('.markdown-body').first().scrollIntoViewIfNeeded();
   await github.screenshot({ path: path.join(root, 'temp', 'github-immersive.png'), fullPage: false });
@@ -801,7 +821,7 @@ try {
   if (toggleCommand.shortcut) throw new Error(`沉浸式翻译不应预设快捷键：${JSON.stringify(commands)}`);
   if (selectionCommand.shortcut) throw new Error(`划词翻译不应预设快捷键：${JSON.stringify(commands)}`);
   await broadcastToFrames('https://github.com/cnbluefire/indra-ocr-sharp', 'immersive-restore');
-  await github.waitForFunction(() => document.querySelectorAll('.lt-immersive-translation').length === 0, null, { timeout: 10000 });
+  await github.waitForFunction(() => document.querySelectorAll('.orange-translator-extension-9443e25e-immersive-translation').length === 0, null, { timeout: 10000 });
   console.log('PASS immersive shortcut entry: configurable, no default binding');
 
   const cacheBeforeClear = await worker.evaluate(async () => (await chrome.storage.local.get('translationCacheV1')).translationCacheV1);

@@ -116,7 +116,7 @@ button:active { background:var(--accent-pressed); transform:translateY(1px); }
 .save-secret { background:var(--accent); }
 .action-state { display:inline-flex; align-items:center; flex:0 0 auto; margin-left:auto; color:var(--muted); font-size:12px; font-style:normal; font-weight:500; white-space:nowrap; }
 .action-state[hidden] { display:none !important; }
-.action-item.is-active>span { background:var(--accent-soft); color:var(--accent-hover); box-shadow:inset 0 0 0 1px var(--accent-border); }
+.action-item.orange-translator-extension-9443e25e-state-active>span { background:var(--accent-soft); color:var(--accent-hover); box-shadow:inset 0 0 0 1px var(--accent-border); }
 .quick-result { max-height:min(220px, 35vh); overflow-x:hidden; overflow-y:auto; overscroll-behavior:contain; scrollbar-gutter:stable; overflow-wrap:anywhere; }
 .quick-result::-webkit-scrollbar { width:8px; }
 .quick-result::-webkit-scrollbar-thumb { border:2px solid transparent; border-radius:8px; background:#aeb5bf; background-clip:padding-box; }

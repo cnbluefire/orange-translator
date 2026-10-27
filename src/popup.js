@@ -47,7 +47,7 @@ document.querySelector('#page').onclick = async () => {
 function showImmersiveState(active) {
   immersiveActive = active;
   const item = document.querySelector('#page');
-  item.classList.toggle('is-active', active);
+  item.classList.toggle('orange-translator-extension-9443e25e-state-active', active);
   const state = item.querySelector('[data-immersive-state]');
   state.hidden = !active;
   item.setAttribute('aria-pressed', String(active));

@@ -8,7 +8,7 @@
 - Source: <https://github.com/mozilla/pdf.js>
 - Copyright: Mozilla Foundation and PDF.js contributors
 - License: Apache License 2.0
-- Included under: `src/pdf-viewer/` and `src/vendor/`
+- Included under: `src/pdf-viewer/`
 
 PDF.js Viewer 文件内保留了原始 Apache-2.0 许可头。Apache License 2.0 全文：
 <https://www.apache.org/licenses/LICENSE-2.0>
