@@ -54,6 +54,11 @@ try {
   options.on('pageerror', error => console.error('OPTIONS PAGE ERROR:', error.message));
   await gotoExtensionPage(options, 'options.html');
   await options.locator('#provider').waitFor({ state: 'visible' });
+  const githubLink = await options.locator('.github-link').evaluate(node => ({ href:node.href, width:node.getBoundingClientRect().width, height:node.getBoundingClientRect().height, svgWidth:node.querySelector('svg').getBoundingClientRect().width }));
+  if (githubLink.href !== 'https://github.com/cnbluefire/orange-translator' && githubLink.href !== 'https://github.com/cnbluefire/orange-translator/') throw new Error(`设置页 GitHub 链接错误：${JSON.stringify(githubLink)}`);
+  if (githubLink.width < 65 || Math.abs(githubLink.height - 24) > 1 || Math.abs(githubLink.svgWidth - 14) > 1) throw new Error(`设置页 GitHub 胶囊尺寸异常：${JSON.stringify(githubLink)}`);
+  const autoImmersiveDefault = await options.evaluate(async () => (await chrome.storage.local.get('autoImmersiveTranslate')).autoImmersiveTranslate);
+  if (autoImmersiveDefault === true || await options.locator('#autoImmersiveTranslate').isChecked()) throw new Error('自动沉浸式翻译必须默认关闭');
   const enhancedComboboxes = await options.locator('[data-combobox-root]').count();
   if (enhancedComboboxes !== 6) throw new Error(`设置页应有 6 个统一下拉组件，实际为 ${enhancedComboboxes}`);
   await options.locator('#targetLanguage').evaluate(select => select.closest('[data-combobox-root]').querySelector('[data-combobox-button]').click());
@@ -108,6 +113,8 @@ try {
   const popupVisual = await context.newPage();
   await gotoExtensionPage(popupVisual, 'popup.html');
   await popupVisual.locator('#quick-target').waitFor({ state: 'attached' });
+  const immediateLanguageOptions = await popupVisual.locator('#quick-target option').count();
+  if (immediateLanguageOptions < 30) throw new Error(`快速翻译语言列表未立即生成：${immediateLanguageOptions}`);
   await popupVisual.waitForFunction(() => document.querySelector('#quick-target')?.closest('[data-combobox-root]'));
   const globalTargetBeforeQuickChange = await popupVisual.evaluate(async () => (await chrome.storage.local.get('targetLanguage')).targetLanguage);
   await popupVisual.locator('#quick-target').evaluate(select => select.closest('[data-combobox-root]').querySelector('[data-combobox-button]').click());
@@ -272,6 +279,18 @@ try {
     const ballBefore = await mobilePage.locator('#lt-immersive-ball').boundingBox();
     const mobilePageViewport = await mobilePage.evaluate(() => ({ width: innerWidth, height: innerHeight }));
     if (!ballBefore || ballBefore.x < 0 || ballBefore.y < 0 || ballBefore.x + ballBefore.width > mobilePageViewport.width || ballBefore.y + ballBefore.height > mobilePageViewport.height) throw new Error(`沉浸式快捷橙子不在视口内：${JSON.stringify({ ballBefore, mobilePageViewport })}`);
+    await mobilePage.locator('#lt-immersive-ball').evaluate(node => {
+      const rect = node.getBoundingClientRect();
+      node.dispatchEvent(new PointerEvent('pointerdown', { bubbles:true, pointerType:'touch', pointerId:91, clientX:rect.left+22, clientY:rect.top+22 }));
+      node.dispatchEvent(new PointerEvent('pointermove', { bubbles:true, pointerType:'touch', pointerId:91, clientX:rect.left+30, clientY:rect.top+22 }));
+      node.dispatchEvent(new PointerEvent('pointerup', { bubbles:true, pointerType:'touch', pointerId:91, clientX:rect.left+30, clientY:rect.top+22 }));
+    });
+    await mobilePage.locator('#lt-immersive-ball.is-active').waitFor({ state:'visible', timeout:5000 });
+    const ballAfterJitter = await mobilePage.locator('#lt-immersive-ball').boundingBox();
+    if (!ballAfterJitter || Math.abs(ballAfterJitter.x - ballBefore.x) > 1 || Math.abs(ballAfterJitter.y - ballBefore.y) > 1) throw new Error(`触屏轻微抖动不应移动橙子：${JSON.stringify({ ballBefore, ballAfterJitter })}`);
+    const jitterTabId = await mobileWorker.evaluate(async urlPrefix => (await chrome.tabs.query({})).find(tab => tab.url?.startsWith(urlPrefix))?.id || 0, url);
+    await mobileOptions.evaluate(tabId => chrome.runtime.sendMessage({ type:'broadcast-immersive', action:'restore', tabId }), jitterTabId);
+    await mobilePage.waitForFunction(() => !document.querySelector('#lt-immersive-ball')?.classList.contains('is-active'), null, { timeout:10000 });
     await mobilePage.mouse.move(ballBefore.x + 22, ballBefore.y + 22);
     await mobilePage.mouse.down();
     await mobilePage.mouse.move(180, 420, { steps: 5 });
@@ -281,12 +300,16 @@ try {
     const spinStart = Date.now();
     await mobilePage.locator('#lt-immersive-ball').click();
     await mobilePage.locator('#lt-immersive-ball.is-translating').waitFor({ state: 'visible', timeout: 5000 });
+    await mobilePage.locator('#lt-immersive-ball.is-active').waitFor({ state: 'visible', timeout: 5000 });
     await mobilePage.waitForFunction(() => document.querySelector('.lt-immersive-translation') || document.querySelector('#lt-root')?.textContent?.includes('翻译失败'), null, { timeout: 90000 });
     await mobilePage.waitForFunction(() => !document.querySelector('#lt-immersive-ball')?.classList.contains('is-translating'), null, { timeout: 10000 });
     if (Date.now() - spinStart < 560) throw new Error(`沉浸式快捷橙子旋转未完成一圈：${Date.now() - spinStart}ms`);
     const mobilePageTabId = await mobileWorker.evaluate(async urlPrefix => (await chrome.tabs.query({})).find(tab => tab.url?.startsWith(urlPrefix))?.id || 0, url);
+    const backendActive = await mobileOptions.evaluate(tabId => chrome.runtime.sendMessage({ type:'get-immersive-state', tabId }), mobilePageTabId);
+    if (!backendActive) throw new Error('后台没有同步沉浸式翻译启用状态');
     await mobileOptions.evaluate(tabId => chrome.runtime.sendMessage({ type: 'broadcast-immersive', action: 'restore', tabId }), mobilePageTabId);
     await mobilePage.waitForFunction(() => document.querySelectorAll('.lt-immersive-translation').length === 0, null, { timeout: 10000 });
+    if (await mobilePage.locator('#lt-immersive-ball.is-active').count()) throw new Error('退出后常驻橙子仍显示启用状态');
 
     await mobilePage.evaluate(() => {
       const target = document.querySelector('main');
@@ -377,6 +400,20 @@ try {
   }
 
   await testProvider(provider);
+  await worker.evaluate(() => chrome.storage.local.set({ autoImmersiveTranslate: true }));
+  const autoImmersivePage = await context.newPage();
+  await autoImmersivePage.goto(`${url}/?auto-immersive=1`, { waitUntil:'domcontentloaded' });
+  await autoImmersivePage.waitForFunction(() => document.querySelector('.lt-immersive-translation'), null, { timeout:90000 });
+  const autoImmersiveTabId = await options.evaluate(async () => (await chrome.tabs.query({})).find(tab => tab.url?.includes('auto-immersive=1'))?.id || 0);
+  const popupStatePage = await context.newPage();
+  await gotoExtensionPage(popupStatePage, 'popup.html');
+  await popupStatePage.waitForFunction(() => !document.querySelector('[data-immersive-state]')?.hidden);
+  if (!await popupStatePage.locator('#page').evaluate(node => node.classList.contains('is-active') && node.getAttribute('aria-pressed') === 'true')) throw new Error('Popup 没有显示沉浸式翻译已启用状态');
+  await popupStatePage.close();
+  await options.evaluate(tabId => chrome.runtime.sendMessage({ type:'broadcast-immersive', action:'restore', tabId }), autoImmersiveTabId);
+  await autoImmersivePage.close();
+  await worker.evaluate(() => chrome.storage.local.set({ autoImmersiveTranslate: false }));
+  console.log('PASS immersive active indicators and automatic translation setting');
   const page = await context.newPage();
   await page.goto(url);
   await worker.evaluate(() => chrome.storage.local.set({ enableSelectionTrigger: false }));
@@ -659,6 +696,41 @@ try {
   await articleFrame.waitForFunction(() => document.querySelectorAll('.lt-immersive-translation').length === 0, null, { timeout: 10000 });
   if (await page.locator('.lt-immersive-loading').count() || await articleFrame.locator('.lt-immersive-loading').count()) throw new Error('还原后仍残留加载占位符');
   console.log('PASS iframe restore: parent and child frames cleared together');
+
+  await context.route('https://www.youtube.com/watch**', route => route.fulfill({
+    status: 200,
+    contentType: 'text/html; charset=utf-8',
+    body: '<!doctype html><meta name="viewport" content="width=device-width"><div id="movie_player" class="html5-video-player playing-mode" style="position:relative;width:800px;height:450px;background:#111"><div id="ytp-caption-window-container" class="ytp-caption-window-container"><div class="caption-window"><div class="caption-visual-line"><span class="ytp-caption-segment">This is the original YouTube subtitle.</span></div></div></div></div><main><ytd-comment-renderer><yt-formatted-string id="content-text" class="ytd-comment-renderer">This is a visible YouTube comment that should be translated.</yt-formatted-string></ytd-comment-renderer><div id="dynamic-comments"></div></main>'
+  }));
+  const youtube = await context.newPage();
+  await youtube.goto('https://www.youtube.com/watch?v=orange-translator-test', { waitUntil: 'domcontentloaded', timeout: 30000 });
+  await youtube.locator('#lt-trigger').waitFor({ state:'attached', timeout:10000 });
+  const youtubeTabId = await options.evaluate(async () => (await chrome.tabs.query({})).find(tab => tab.url?.includes('orange-translator-test'))?.id || 0);
+  await options.evaluate(tabId => chrome.runtime.sendMessage({ type:'broadcast-immersive', action:'start', tabId }), youtubeTabId);
+  await youtube.locator('#lt-youtube-subtitle:not([hidden])').waitFor({ timeout:90000 });
+  if (!await youtube.locator('.ytp-caption-segment').isVisible()) throw new Error('YouTube 原字幕不应被隐藏');
+  await youtube.locator('yt-formatted-string#content-text .lt-immersive-translation').waitFor({ timeout:90000 });
+  if (!await youtube.locator('yt-formatted-string#content-text').textContent()) throw new Error('YouTube 评论原文不应被替换');
+  await youtube.waitForFunction(() => !document.querySelector('#lt-immersive-ball')?.classList.contains('is-translating'), null, { timeout:10000 });
+  const firstYoutubeTranslation = (await youtube.locator('#lt-youtube-subtitle').textContent())?.trim();
+  if (!firstYoutubeTranslation) throw new Error('YouTube 双语字幕没有生成译文');
+  await youtube.locator('.ytp-caption-segment').evaluate(node => { node.textContent = 'The subtitle changed to a new sentence.'; });
+  await youtube.waitForTimeout(120);
+  if (await youtube.locator('#lt-immersive-ball.is-translating').count()) throw new Error('仅 YouTube 字幕更新时常驻橙子不应旋转');
+  await youtube.waitForFunction(previous => { const text=document.querySelector('#lt-youtube-subtitle')?.textContent?.trim(); return text && text !== previous; }, firstYoutubeTranslation, { timeout:90000 });
+  await youtube.locator('#dynamic-comments').evaluate(container => {
+    const comment = document.createElement('yt-formatted-string');
+    comment.id = 'content-text'; comment.className = 'ytd-comment-renderer';
+    comment.textContent = 'This dynamically loaded YouTube reply should also be translated.';
+    container.append(comment);
+  });
+  await youtube.locator('#dynamic-comments .lt-immersive-translation').waitFor({ timeout:90000 });
+  await options.evaluate(tabId => chrome.runtime.sendMessage({ type:'broadcast-immersive', action:'restore', tabId }), youtubeTabId);
+  await youtube.locator('#lt-youtube-subtitle').waitFor({ state:'detached', timeout:10000 });
+  if (await youtube.locator('.lt-immersive-translation').count()) throw new Error('退出 YouTube 翻译后评论译文仍有残留');
+  await youtube.close();
+  await context.unroute('https://www.youtube.com/watch**');
+  console.log('PASS YouTube alignment: subtitles, comments, dynamic replies, and restore');
 
   const github = await context.newPage();
   await github.goto('https://github.com/cnbluefire/indra-ocr-sharp', { waitUntil: 'domcontentloaded', timeout: 120000 });

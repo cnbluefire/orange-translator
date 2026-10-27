@@ -9,9 +9,29 @@ const i18n = globalThis.LiteTranslateI18n;
 const t = (key, values) => i18n.t(key, values);
 const show = text => { result.hidden = false; result.textContent = text; };
 let popupTabId = 0;
+let immersiveActive = false;
+
+fillLanguageSelect(target);
+target.value = 'zh-CN';
+buildCombobox(target);
+syncCombobox(target);
+
+async function sessionGet(key) {
+  if (!key || !chrome.storage.session) return {};
+  return chrome.storage.session.get(key).catch(() => ({}));
+}
+
+async function sessionSet(value) {
+  if (!chrome.storage.session) return;
+  await chrome.storage.session.set(value).catch(() => {});
+}
+
+function withTimeout(promise, fallback, timeout = 800) {
+  return Promise.race([promise, new Promise(resolve => setTimeout(() => resolve(fallback), timeout))]);
+}
 
 async function currentPopupContext() {
-  return chrome.runtime.sendMessage({ type: 'get-popup-context' }).catch(() => ({ tabId: 0, text: '' }));
+  return withTimeout(chrome.runtime.sendMessage({ type: 'get-popup-context' }).catch(() => ({ tabId: 0, text: '' })), { tabId: 0, text: '' });
 }
 
 document.querySelector('#options').onclick = () => chrome.runtime.openOptionsPage();
@@ -20,20 +40,28 @@ document.querySelector('#pdf').onclick = async () => {
   window.close();
 };
 document.querySelector('#page').onclick = async () => {
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  if (tab?.id) chrome.runtime.sendMessage({ type: 'broadcast-immersive', action: 'start', tabId: tab.id });
+  if (popupTabId) chrome.runtime.sendMessage({ type: 'broadcast-immersive', action: 'toggle', tabId: popupTabId });
   window.close();
 };
 
+function showImmersiveState(active) {
+  immersiveActive = active;
+  const item = document.querySelector('#page');
+  item.classList.toggle('is-active', active);
+  const state = item.querySelector('[data-immersive-state]');
+  state.hidden = !active;
+  item.setAttribute('aria-pressed', String(active));
+}
+
 const initialized = (async () => {
   const cfg = await settings();
+  await i18n.load(cfg.uiLanguage).catch(() => i18n.init());
+  i18n.localize();
   const context = await currentPopupContext();
   popupTabId = context.tabId || 0;
+  showImmersiveState(popupTabId ? await chrome.runtime.sendMessage({ type:'get-immersive-state', tabId:popupTabId }).catch(() => false) : false);
   const sessionKey = popupTabId ? `quickTargetLanguage:${popupTabId}` : '';
-  const session = sessionKey ? await chrome.storage.session.get(sessionKey) : {};
-  await i18n.load(cfg.uiLanguage);
-  i18n.localize();
-  fillLanguageSelect(target);
+  const session = await sessionGet(sessionKey);
   target.value = normalizeLanguage(session[sessionKey], normalizeLanguage(cfg.targetLanguage, 'zh-CN'));
   buildCombobox(target);
   syncCombobox(target);
@@ -44,7 +72,7 @@ const initialized = (async () => {
 target.addEventListener('change', async () => {
   if (!target.value) return;
   syncCombobox(target);
-  if (popupTabId) await chrome.storage.session.set({ [`quickTargetLanguage:${popupTabId}`]: target.value });
+  if (popupTabId) await sessionSet({ [`quickTargetLanguage:${popupTabId}`]: target.value });
 });
 
 async function translate() {

@@ -35,6 +35,7 @@ let panelMode = '';
 let selectionRequest = null;
 let selectionVersion = 0;
 let immersiveState = null;
+let youtubeSubtitleState = null;
 let hoverTimer = null;
 let triggerTimer = null;
 let triggerAnimationTimer = null;
@@ -92,7 +93,7 @@ document.addEventListener('pointerup', finishTouchPointer, true);
 document.addEventListener('pointercancel', event => { activeTouchPointers.delete(event.pointerId); pointerGestureCandidate = null; }, true);
 
 function clampImmersiveBall(left, top) {
-  const size = 48;
+  const size = 44;
   return {
     left: Math.min(window.innerWidth - size - 8, Math.max(8, left)),
     top: Math.min(window.innerHeight - size - 8, Math.max(8, top))
@@ -134,16 +135,24 @@ function updateImmersiveBallActivity(active) {
   }, remaining < 24 ? cycleMs : remaining);
 }
 
+function setImmersiveActiveIndicator(active) {
+  immersiveBall.classList.toggle('is-active', active);
+  immersiveBall.setAttribute('aria-pressed', String(active));
+  if (IS_TOP_FRAME) chrome.runtime.sendMessage({ type:'immersive-state-changed', active }).catch(() => {});
+}
+
 immersiveBall.addEventListener('pointerdown', event => {
   const rect = immersiveBall.getBoundingClientRect();
-  immersiveBallDrag = { id: event.pointerId, offsetX: event.clientX - rect.left, offsetY: event.clientY - rect.top, startX: event.clientX, startY: event.clientY, moved: false };
+  immersiveBallDrag = { id: event.pointerId, pointerType: event.pointerType, offsetX: event.clientX - rect.left, offsetY: event.clientY - rect.top, startX: event.clientX, startY: event.clientY, moved: false };
   immersiveBall.classList.add('is-pressed');
   immersiveBall.setPointerCapture?.(event.pointerId);
   event.preventDefault();
 });
 immersiveBall.addEventListener('pointermove', event => {
   if (!immersiveBallDrag || event.pointerId !== immersiveBallDrag.id) return;
-  if (Math.hypot(event.clientX - immersiveBallDrag.startX, event.clientY - immersiveBallDrag.startY) > 5) immersiveBallDrag.moved = true;
+  const dragThreshold = immersiveBallDrag.pointerType === 'touch' ? 14 : 5;
+  if (Math.hypot(event.clientX - immersiveBallDrag.startX, event.clientY - immersiveBallDrag.startY) > dragThreshold) immersiveBallDrag.moved = true;
+  if (!immersiveBallDrag.moved) return;
   if (immersiveBallDrag.moved) immersiveBall.classList.add('is-dragging');
   const next = clampImmersiveBall(event.clientX - immersiveBallDrag.offsetX, event.clientY - immersiveBallDrag.offsetY);
   immersiveBall.style.left = `${next.left}px`;
@@ -626,6 +635,8 @@ function replaceLoadingWithTranslation(loading, translation, targetLanguage, the
 
 function restoreImmersive() {
   updateImmersiveBallActivity(false);
+  setImmersiveActiveIndicator(false);
+  stopYouTubeSubtitles();
   if (immersiveState) immersiveState.active = false;
   immersiveState?.observer?.disconnect();
   immersiveState?.dynamicObserver?.disconnect();
@@ -648,6 +659,96 @@ function restoreImmersive() {
     root.className = '';
     panelMode = '';
   }
+}
+
+function isYouTubePage() {
+  return /(^|\.)youtube(?:-nocookie)?\.com$/i.test(location.hostname);
+}
+
+function youtubeCaptionText(player) {
+  const segments = [...player.querySelectorAll('.ytp-caption-segment')];
+  if (segments.length) return segments.map(node => node.textContent || '').join(' ').replace(/\s+/g, ' ').trim();
+  return [...player.querySelectorAll('.caption-window .caption-visual-line')].map(node => node.textContent || '').join(' ').replace(/\s+/g, ' ').trim();
+}
+
+function ensureYouTubeSubtitleOverlay(player) {
+  let overlay = player.querySelector(':scope > #lt-youtube-subtitle');
+  if (overlay) return overlay;
+  overlay = document.createElement('div');
+  overlay.id = 'lt-youtube-subtitle';
+  overlay.lang = 'zh-CN';
+  player.append(overlay);
+  return overlay;
+}
+
+async function translateYouTubeCaption(state, text) {
+  if (!text || text === state.sourceText || !state.active) return;
+  state.sourceText = text;
+  const version = ++state.version;
+  state.controller?.abort();
+  state.controller = new AbortController();
+  try {
+    const translated = await translateItems([{ id: 'youtube-caption', text }], state.cfg, state.controller.signal);
+    if (!state.active || version !== state.version) return;
+    const value = validateTranslations([{ id: 'youtube-caption', text }], { translations: translated })[0].translation;
+    state.overlay.textContent = value;
+    state.overlay.hidden = false;
+  } catch (error) {
+    if (error.name !== 'AbortError' && version === state.version) state.overlay.hidden = true;
+  }
+}
+
+function refreshYouTubeCaption(state) {
+  clearTimeout(state.timer);
+  state.timer = setTimeout(() => {
+    if (!state.active) return;
+    const text = youtubeCaptionText(state.player);
+    if (!text) {
+      state.sourceText = '';
+      state.overlay.hidden = true;
+      return;
+    }
+    translateYouTubeCaption(state, text);
+  }, 80);
+}
+
+async function startYouTubeSubtitles(cfg) {
+  if (!isYouTubePage()) return false;
+  let player = document.querySelector('.html5-video-player, #movie_player');
+  for (let attempt = 0; !player && attempt < 20; attempt += 1) {
+    await new Promise(resolve => setTimeout(resolve, 100));
+    player = document.querySelector('.html5-video-player, #movie_player');
+  }
+  if (!player) return false;
+  stopYouTubeSubtitles();
+  const state = {
+    active: true,
+    cfg,
+    player,
+    overlay: ensureYouTubeSubtitleOverlay(player),
+    observer: null,
+    controller: null,
+    timer: null,
+    version: 0,
+    sourceText: ''
+  };
+  state.overlay.hidden = true;
+  state.observer = new MutationObserver(() => refreshYouTubeCaption(state));
+  state.observer.observe(player, { childList: true, subtree: true, characterData: true });
+  youtubeSubtitleState = state;
+  refreshYouTubeCaption(state);
+  return true;
+}
+
+function stopYouTubeSubtitles() {
+  const state = youtubeSubtitleState;
+  if (!state) return;
+  state.active = false;
+  state.observer?.disconnect();
+  state.controller?.abort();
+  clearTimeout(state.timer);
+  state.overlay?.remove();
+  youtubeSubtitleState = null;
 }
 
 function updateImmersiveStatus(state, label = t('continueOnScroll')) {
@@ -838,6 +939,7 @@ async function flushVisibleBatch(state) {
     if (error.name !== 'AbortError' && state.active) {
       state.active = false;
       updateImmersiveBallActivity(false);
+      setImmersiveActiveIndicator(false);
       state.observer.disconnect();
       if (panelMode === 'immersive') {
         root.replaceChildren();
@@ -885,11 +987,14 @@ function resumeImmersive() {
 
 async function immersive() {
   await localeReady;
-  if (immersiveState) return;
+  if (immersiveState || youtubeSubtitleState) return;
   const cfg = await settings();
+  setImmersiveActiveIndicator(true);
+  const youtubeSubtitlesStarted = await startYouTubeSubtitles(cfg);
   const nodes = blocks(cfg);
-  if (!nodes.length) {
+  if (!nodes.length && !youtubeSubtitlesStarted) {
     updateImmersiveBallActivity(false);
+    setImmersiveActiveIndicator(false);
     return;
   }
   const items = nodes.map((source, index) => ({ id: `p-${index}`, source, text: source.innerText.replace(/\s+/g, ' ').trim() }));
@@ -1135,3 +1240,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
     if (original) original.textContent = t('original');
   });
 });
+
+if (IS_TOP_FRAME && /^https?:$/i.test(location.protocol)) {
+  settings().then(cfg => { if (cfg.autoImmersiveTranslate === true) chrome.runtime.sendMessage({ type:'broadcast-immersive', action:'start' }); }).catch(() => {});
+}

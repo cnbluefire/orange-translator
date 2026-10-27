@@ -2,7 +2,7 @@ import { DEFAULTS, clearTranslationCache, settings, translateText, translationCa
 import { fillLanguageSelect, normalizeLanguage } from './languages.js';
 import { buildComboboxes, syncCombobox, syncComboboxes } from './combobox.js';
 
-const ids = ['provider', 'baseUrl', 'model', 'apiKey', 'azureEndpoint', 'azureKey', 'azureRegion', 'googleKey', 'enableSelectionTrigger', 'showImmersiveBall', 'touchGesture', 'translationTheme', 'uiLanguage', 'targetLanguage', 'sourceLanguage'];
+const ids = ['provider', 'baseUrl', 'model', 'apiKey', 'azureEndpoint', 'azureKey', 'azureRegion', 'googleKey', 'enableSelectionTrigger', 'showImmersiveBall', 'autoImmersiveTranslate', 'touchGesture', 'translationTheme', 'uiLanguage', 'targetLanguage', 'sourceLanguage'];
 const secretIds = ['apiKey', 'azureKey', 'googleKey'];
 const instantIds = ids.filter(id => !secretIds.includes(id));
 const $ = id => document.querySelector(id.startsWith('#') ? id : `#${id}`);

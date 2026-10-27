@@ -59,8 +59,9 @@ async function sendToAllFrames(tabId, message) {
 async function selectedTextFromTab(tabId) {
   if (!tabId) return '';
   const frames = await chrome.webNavigation.getAllFrames({ tabId }).catch(() => null);
-  if (!frames?.length) return chrome.tabs.sendMessage(tabId, { type: 'get-selected-text' }).catch(() => '');
-  const responses = await Promise.all(frames.map(frame => chrome.tabs.sendMessage(tabId, { type: 'get-selected-text' }, { frameId: frame.frameId }).catch(() => '')));
+  const bounded = promise => Promise.race([promise.catch(() => ''), new Promise(resolve => setTimeout(() => resolve(''), 300))]);
+  if (!frames?.length) return bounded(chrome.tabs.sendMessage(tabId, { type: 'get-selected-text' }));
+  const responses = await Promise.all(frames.map(frame => bounded(chrome.tabs.sendMessage(tabId, { type: 'get-selected-text' }, { frameId: frame.frameId }))));
   return responses.find(text => typeof text === 'string' && text.trim())?.trim() || '';
 }
 async function selectedTextForPopup() {
@@ -81,11 +82,8 @@ async function popupContext() {
   const candidates = tabs
     .filter(tab => tab.id && tab.url && !tab.url.startsWith(extensionOrigin))
     .sort((a, b) => Number(b.id === lastWebTabId) - Number(a.id === lastWebTabId) || Number(b.active) - Number(a.active) || (b.lastAccessed || 0) - (a.lastAccessed || 0));
-  for (const tab of candidates) {
-    const text = await selectedTextFromTab(tab.id);
-    if (text) return { tabId: tab.id, text };
-  }
-  return { tabId: candidates[0]?.id || 0, text: '' };
+  const tab = candidates[0];
+  return { tabId: tab?.id || 0, text: tab?.id ? await selectedTextFromTab(tab.id) : '' };
 }
 async function controlImmersive(tabId, action) {
   if (action === 'start' || action === 'resume') immersiveTabs.add(tabId);
@@ -124,6 +122,15 @@ chrome.commands.onCommand.addListener(async command => {
   if (command === 'toggle-immersive') controlImmersive(tab.id, immersiveTabs.has(tab.id) ? 'restore' : 'start');
 });
 chrome.runtime.onMessage.addListener((message, sender) => {
+  if (message?.type === 'get-immersive-state') {
+    const tabId = message.tabId || sender.tab?.id;
+    return Promise.resolve(Boolean(tabId && immersiveTabs.has(tabId)));
+  }
+  if (message?.type === 'immersive-state-changed') {
+    const tabId = sender.tab?.id || message.tabId;
+    if (tabId) message.active ? immersiveTabs.add(tabId) : immersiveTabs.delete(tabId);
+    return;
+  }
   if (message?.type === 'get-popup-context') return popupContext();
   if (message?.type === 'get-active-selection') return selectedTextForPopup();
   if (message?.type === 'open-options-page') return chrome.runtime.openOptionsPage();
@@ -176,7 +183,7 @@ chrome.runtime.onMessage.addListener((message, sender) => {
 });
 chrome.tabs.onRemoved.addListener(tabId => {
   immersiveTabs.delete(tabId);
-  chrome.storage.session.remove(`quickTargetLanguage:${tabId}`).catch(() => {});
+  chrome.storage.session?.remove(`quickTargetLanguage:${tabId}`).catch(() => {});
 });
 chrome.tabs.onUpdated.addListener((tabId, changeInfo) => { if (changeInfo.status === 'loading') immersiveTabs.delete(tabId); });
 chrome.tabs.onActivated.addListener(({ tabId }) => {

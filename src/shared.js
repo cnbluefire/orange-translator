@@ -9,6 +9,7 @@ export const DEFAULTS = {
   googleKey: '',
   enableSelectionTrigger: true,
   showImmersiveBall: true,
+  autoImmersiveTranslate: false,
   immersiveBallPosition: null,
   touchGesture: 'disabled',
   translationTheme: 'opacity',
