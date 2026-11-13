@@ -478,7 +478,8 @@ try {
     const target = document.querySelector('main');
     const points = [[1,80,80],[2,110,80],[3,140,80]];
     for (const [pointerId, clientX, clientY] of points) target.dispatchEvent(new PointerEvent('pointerdown', { bubbles:true, pointerType:'touch', pointerId, clientX, clientY, isPrimary:pointerId===1 }));
-    for (const [pointerId, clientX, clientY] of points) target.dispatchEvent(new PointerEvent('pointerup', { bubbles:true, pointerType:'touch', pointerId, clientX, clientY, isPrimary:pointerId===1 }));
+    target.dispatchEvent(new PointerEvent('pointerup', { bubbles:true, pointerType:'touch', pointerId:1, clientX:80, clientY:80, isPrimary:true }));
+    for (const [pointerId, clientX, clientY] of points.slice(1)) target.dispatchEvent(new PointerEvent('pointercancel', { bubbles:true, pointerType:'touch', pointerId, clientX, clientY }));
   });
   await page.waitForFunction(() => document.querySelector('.orange-translator-extension-9443e25e-immersive-translation') || document.querySelector('#orange-translator-extension-9443e25e-root')?.textContent?.includes('翻译失败'), null, { timeout: 90000 });
   if (!await page.locator('.orange-translator-extension-9443e25e-immersive-translation').count()) throw new Error('三指轻触没有触发沉浸式翻译');
@@ -497,7 +498,19 @@ try {
   console.log('PASS translation themes: colored source text does not override decoration colors');
   await broadcastToFrames('http://127.0.0.1:', 'immersive-restore');
   await page.waitForFunction(() => document.querySelectorAll('.orange-translator-extension-9443e25e-immersive-translation').length === 0, null, { timeout: 10000 });
-  console.log('PASS touch gesture: three-finger tap toggles immersive translation');
+  await worker.evaluate(() => chrome.storage.local.set({ touchGesture: 'four' }));
+  await page.waitForTimeout(250);
+  await page.evaluate(() => {
+    const target = document.querySelector('main');
+    const points = [[11,80,80],[12,110,80],[13,140,80],[14,170,80]];
+    for (const [pointerId, clientX, clientY] of points) target.dispatchEvent(new PointerEvent('pointerdown', { bubbles:true, pointerType:'touch', pointerId, clientX, clientY, isPrimary:pointerId===11 }));
+    target.dispatchEvent(new PointerEvent('pointerup', { bubbles:true, pointerType:'touch', pointerId:11, clientX:80, clientY:80, isPrimary:true }));
+    for (const [pointerId, clientX, clientY] of points.slice(1)) target.dispatchEvent(new PointerEvent('pointercancel', { bubbles:true, pointerType:'touch', pointerId, clientX, clientY }));
+  });
+  await page.waitForFunction(() => document.querySelector('#orange-translator-extension-9443e25e-immersive-ball')?.classList.contains('orange-translator-extension-9443e25e-state-active'), null, { timeout: 5000 });
+  await broadcastToFrames('http://127.0.0.1:', 'immersive-restore');
+  await page.waitForFunction(() => !document.querySelector('#orange-translator-extension-9443e25e-immersive-ball')?.classList.contains('orange-translator-extension-9443e25e-state-active'), null, { timeout: 10000 });
+  console.log('PASS touch gesture: three- and four-finger taps tolerate trailing pointer cancellation');
   await page.evaluate(() => {
     const range = document.createRange();
     range.selectNodeContents(document.querySelector('#p1'));

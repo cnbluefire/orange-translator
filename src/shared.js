@@ -1,3 +1,5 @@
+const { fetch, setTimeout, clearTimeout, atob, encodeURIComponent, dateNow, imul, AbortController, DOMException } = globalThis.OrangeTranslatorPlatform;
+
 export const DEFAULTS = {
   provider: 'microsoft-free',
   baseUrl: 'https://api.openai.com/v1',
@@ -31,7 +33,7 @@ function cacheHash(value) {
   let hash = 2166136261;
   for (let index = 0; index < value.length; index += 1) {
     hash ^= value.charCodeAt(index);
-    hash = Math.imul(hash, 16777619);
+    hash = imul(hash, 16777619);
   }
   return (hash >>> 0).toString(36);
 }
@@ -125,7 +127,7 @@ let edgeToken = '';
 let edgeExpiry = 0;
 
 async function edgeAuth(signal) {
-  if (edgeToken && edgeExpiry > Date.now() + 60000) return edgeToken;
+  if (edgeToken && edgeExpiry > dateNow() + 60000) return edgeToken;
   try {
     const token = (await (await request('https://edge.microsoft.com/translate/auth', { method: 'GET', headers: { 'User-Agent': EDGE_UA } }, signal)).text()).trim();
     let exp = 0;
@@ -134,11 +136,11 @@ async function edgeAuth(signal) {
       exp = Number(JSON.parse(atob(payload)).exp) || 0;
     } catch { exp = 0; }
     edgeToken = token;
-    edgeExpiry = exp ? exp * 1000 : Date.now() + 8 * 60 * 1000;
+    edgeExpiry = exp ? exp * 1000 : dateNow() + 8 * 60 * 1000;
   } catch {
     // 部分网络环境下取令牌接口不可用，翻译端点仍可能直接接受请求
     edgeToken = '';
-    edgeExpiry = Date.now() + 60000;
+    edgeExpiry = dateNow() + 60000;
   }
   return edgeToken;
 }
@@ -246,7 +248,7 @@ async function translateItemsUncached(items, cfg, signal) {
 
 export async function translateItems(items, cfg = null, signal) {
   cfg ||= await settings();
-  const now = Date.now();
+  const now = dateNow();
   const cache = await loadTranslationCache();
   const results = new Map();
   const misses = [];

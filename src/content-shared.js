@@ -1,4 +1,5 @@
 globalThis.LiteTranslate = (() => {
+  const { randomUUID, setTimeout, clearTimeout, atob, encodeURIComponent, dateNow, imul, AbortController, DOMException, Response } = globalThis.OrangeTranslatorPlatform;
   const DEFAULTS = {
     provider: 'microsoft-free',
     baseUrl: 'https://api.openai.com/v1',
@@ -30,7 +31,7 @@ globalThis.LiteTranslate = (() => {
 
   function cacheHash(value) {
     let hash = 2166136261;
-    for (let index = 0; index < value.length; index += 1) { hash ^= value.charCodeAt(index); hash = Math.imul(hash, 16777619); }
+    for (let index = 0; index < value.length; index += 1) { hash ^= value.charCodeAt(index); hash = imul(hash, 16777619); }
     return (hash >>> 0).toString(36);
   }
 
@@ -74,7 +75,7 @@ globalThis.LiteTranslate = (() => {
 
   async function backgroundFetch(url, options = {}, signal) {
     if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
-    const requestId = crypto.randomUUID();
+    const requestId = randomUUID();
     const cancel = () => chrome.runtime.sendMessage({ type: 'http-cancel', requestId }).catch(() => {});
     signal?.addEventListener('abort', cancel, { once: true });
     try {
@@ -135,7 +136,7 @@ globalThis.LiteTranslate = (() => {
   let edgeExpiry = 0;
 
   async function edgeAuth(signal) {
-    if (edgeToken && edgeExpiry > Date.now() + 60000) return edgeToken;
+    if (edgeToken && edgeExpiry > dateNow() + 60000) return edgeToken;
     try {
       const token = (await (await request('https://edge.microsoft.com/translate/auth', { method: 'GET', headers: { 'User-Agent': EDGE_UA } }, signal)).text()).trim();
       let exp = 0;
@@ -144,10 +145,10 @@ globalThis.LiteTranslate = (() => {
         exp = Number(JSON.parse(atob(payload)).exp) || 0;
       } catch { exp = 0; }
       edgeToken = token;
-      edgeExpiry = exp ? exp * 1000 : Date.now() + 8 * 60 * 1000;
+      edgeExpiry = exp ? exp * 1000 : dateNow() + 8 * 60 * 1000;
     } catch {
       edgeToken = '';
-      edgeExpiry = Date.now() + 60000;
+      edgeExpiry = dateNow() + 60000;
     }
     return edgeToken;
   }
@@ -254,7 +255,7 @@ globalThis.LiteTranslate = (() => {
 
   async function translateItems(items, cfg = null, signal) {
     cfg ||= await settings();
-    const now = Date.now();
+    const now = dateNow();
     const cache = await loadTranslationCache();
     const results = new Map();
     const misses = [];

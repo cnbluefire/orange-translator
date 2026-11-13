@@ -1,4 +1,5 @@
 (function () {
+  const { fetch } = globalThis.OrangeTranslatorPlatform;
   let messages = {};
   let locale = 'en';
 

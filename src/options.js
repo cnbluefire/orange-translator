@@ -1,4 +1,5 @@
 import { DEFAULTS, clearTranslationCache, settings, translateText, translationCacheStats } from './shared.js';
+const { setTimeout, clearTimeout } = globalThis.OrangeTranslatorPlatform;
 import { fillLanguageSelect, normalizeLanguage } from './languages.js';
 import { buildComboboxes, syncCombobox, syncComboboxes } from './combobox.js';
 

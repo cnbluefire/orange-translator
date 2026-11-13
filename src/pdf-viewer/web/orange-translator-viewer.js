@@ -1,4 +1,5 @@
 (async () => {
+  const { URL, MutationObserver } = globalThis.OrangeTranslatorPlatform;
   const i18n = globalThis.LiteTranslateI18n;
   const { uiLanguage = 'auto' } = await chrome.storage.local.get({ uiLanguage: 'auto' });
   await i18n.load(uiLanguage);

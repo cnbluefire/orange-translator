@@ -1,3 +1,7 @@
+import './platform.js';
+
+const { fetch, setTimeout, clearTimeout, encodeURIComponent, AbortController, DOMException, URL } = globalThis.OrangeTranslatorPlatform;
+
 const MENU_TEXT = {
   'zh-CN': { selection: '翻译选中文本', immersive: '翻译当前页面' },
   en: { selection: 'Translate selected text', immersive: 'Translate current page' }

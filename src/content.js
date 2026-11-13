@@ -1,4 +1,5 @@
 const { settings, translateItems, validateTranslations } = globalThis.LiteTranslate;
+const { setTimeout, clearTimeout, requestAnimationFrame, performanceNow, AbortController, MutationObserver, IntersectionObserver } = globalThis.OrangeTranslatorPlatform;
 const IS_TOP_FRAME = window === window.top;
 let siteRule = globalThis.LiteTranslateSiteRules?.current?.() || null;
 const i18n = globalThis.LiteTranslateI18n;
@@ -50,6 +51,7 @@ let immersiveBallSpinStartedAt = 0;
 let immersiveBallSpinStopTimer = null;
 let touchGesture = 'disabled';
 let pointerGestureCandidate = null;
+let pointerGestureTriggered = false;
 const activeTouchPointers = new Map();
 const HOVER_INTENT_MS = 500;
 const SCROLL_IDLE_MS = 280;
@@ -66,28 +68,39 @@ document.addEventListener('pointerdown', event => {
   if (event.pointerType !== 'touch' || event.target.closest?.('#orange-translator-extension-9443e25e-root,#orange-translator-extension-9443e25e-trigger,#orange-translator-extension-9443e25e-immersive-ball')) return;
   const required = TOUCH_COUNTS[touchGesture];
   if (!required) return;
+  if (!activeTouchPointers.size) pointerGestureTriggered = false;
   activeTouchPointers.set(event.pointerId, { x: event.clientX, y: event.clientY, moved: false });
-  if (activeTouchPointers.size === required) pointerGestureCandidate = { count: required, startedAt: performance.now(), moved: false };
+  if (!pointerGestureTriggered && activeTouchPointers.size === required) pointerGestureCandidate = { count: required, startedAt: performanceNow(), moved: false };
   else if (activeTouchPointers.size > required) pointerGestureCandidate = null;
 }, true);
 document.addEventListener('pointermove', event => {
   if (event.pointerType !== 'touch' || !activeTouchPointers.has(event.pointerId)) return;
   const point = activeTouchPointers.get(event.pointerId);
-  if (Math.hypot(event.clientX - point.x, event.clientY - point.y) > 18) point.moved = true;
+  if (Math.hypot(event.clientX - point.x, event.clientY - point.y) > 18) {
+    point.moved = true;
+    if (pointerGestureCandidate) pointerGestureCandidate.moved = true;
+  }
 }, true);
 const finishTouchPointer = event => {
   if (event.pointerType !== 'touch' || !activeTouchPointers.has(event.pointerId)) return;
   const point = activeTouchPointers.get(event.pointerId);
   activeTouchPointers.delete(event.pointerId);
   if (point.moved && pointerGestureCandidate) pointerGestureCandidate.moved = true;
-  if (!activeTouchPointers.size && pointerGestureCandidate) {
+  if (pointerGestureCandidate) {
     const candidate = pointerGestureCandidate;
     pointerGestureCandidate = null;
-    if (!candidate.moved && performance.now() - candidate.startedAt <= 500) toggleImmersive();
+    if (!candidate.moved && performanceNow() - candidate.startedAt <= 500) {
+      pointerGestureTriggered = true;
+      toggleImmersive();
+    }
   }
 };
 document.addEventListener('pointerup', finishTouchPointer, true);
-document.addEventListener('pointercancel', event => { activeTouchPointers.delete(event.pointerId); pointerGestureCandidate = null; }, true);
+document.addEventListener('pointercancel', event => {
+  if (event.pointerType !== 'touch') return;
+  activeTouchPointers.delete(event.pointerId);
+  pointerGestureCandidate = null;
+}, true);
 
 function clampImmersiveBall(left, top) {
   const size = 44;
@@ -117,13 +130,13 @@ function updateImmersiveBallActivity(active) {
   immersiveBallSpinStopTimer = null;
   if (active) {
     if (!immersiveBall.classList.contains('orange-translator-extension-9443e25e-state-translating')) {
-      immersiveBallSpinStartedAt = performance.now();
+      immersiveBallSpinStartedAt = performanceNow();
       immersiveBall.classList.add('orange-translator-extension-9443e25e-state-translating');
     }
     return;
   }
   if (!immersiveBall.classList.contains('orange-translator-extension-9443e25e-state-translating')) return;
-  const elapsed = performance.now() - immersiveBallSpinStartedAt;
+  const elapsed = performanceNow() - immersiveBallSpinStartedAt;
   const remaining = cycleMs - (elapsed % cycleMs);
   immersiveBallSpinStopTimer = setTimeout(() => {
     immersiveBall.classList.remove('orange-translator-extension-9443e25e-state-translating');
@@ -346,7 +359,7 @@ function selectionInsideExtensionUi() {
 function selectedPageText() {
   const live = liveSelectionText();
   if (live) return selectionInsideExtensionUi() ? '' : live;
-  return performance.now() - lastSelectionAt <= 10000 ? lastSelectedText : '';
+  return performanceNow() - lastSelectionAt <= 10000 ? lastSelectedText : '';
 }
 
 function controlSelectionText(element) {
@@ -364,7 +377,7 @@ function rememberPageSelection() {
   const rects = [...range.getClientRects()];
   const rect = rects.at(-1) || range.getBoundingClientRect();
   lastSelectedText = text;
-  lastSelectionAt = performance.now();
+  lastSelectionAt = performanceNow();
   lastSelectionAnchor = { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom };
 }
 
@@ -396,7 +409,7 @@ function scheduleTrigger(pointer, capturedAnchor = null) {
     }
     selectedText = text;
     lastSelectedText = text;
-    lastSelectionAt = performance.now();
+    lastSelectionAt = performanceNow();
     lastSelectionAnchor = anchor;
     placeTrigger(position);
   })), 0);
@@ -1019,7 +1032,7 @@ function onSelectionMouseup(event) {
     const rect = rects.at(-1) || range.getBoundingClientRect();
     anchor = { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom };
     lastSelectedText = text;
-    lastSelectionAt = performance.now();
+    lastSelectionAt = performanceNow();
     lastSelectionAnchor = anchor;
   }
   scheduleTrigger(event, anchor);
@@ -1051,7 +1064,7 @@ function setSelectionTriggerEnabled(enabled) {
 }
 
 document.addEventListener('contextmenu', event => {
-  lastContextMenuPoint = { x: event.clientX, y: event.clientY, at: performance.now() };
+  lastContextMenuPoint = { x: event.clientX, y: event.clientY, at: performanceNow() };
   const selection = document.getSelection();
   const text = liveSelectionText();
   if (selection && text && !selectionInsideExtensionUi()) {
@@ -1059,7 +1072,7 @@ document.addEventListener('contextmenu', event => {
     const rects = [...range.getClientRects()];
     const rect = rects.at(-1) || range.getBoundingClientRect();
     lastSelectedText = text;
-    lastSelectionAt = performance.now();
+    lastSelectionAt = performanceNow();
     lastSelectionAnchor = { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom };
   }
 }, true);
@@ -1067,7 +1080,7 @@ document.addEventListener('contextmenu', event => {
 function translateCurrentSelection(source = 'shortcut', suppliedText = '') {
   const selection = document.getSelection();
   const liveText = selectionInsideExtensionUi() ? '' : liveSelectionText();
-  const recentText = performance.now() - lastSelectionAt <= 10000 ? lastSelectedText : '';
+  const recentText = performanceNow() - lastSelectionAt <= 10000 ? lastSelectedText : '';
   const text = String(suppliedText || liveText || recentText).trim();
   if (!text) return;
   let anchor = lastSelectionAnchor;
@@ -1077,7 +1090,7 @@ function translateCurrentSelection(source = 'shortcut', suppliedText = '') {
     const rect = rects.at(-1) || range.getBoundingClientRect();
     anchor = { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom };
   }
-  const recentContextPoint = source === 'context-menu' && lastContextMenuPoint && performance.now() - lastContextMenuPoint.at < 3000
+  const recentContextPoint = source === 'context-menu' && lastContextMenuPoint && performanceNow() - lastContextMenuPoint.at < 3000
     ? lastContextMenuPoint
     : null;
   selectionPosition = null;
